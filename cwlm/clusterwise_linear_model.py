@@ -452,7 +452,7 @@ class ClusterwiseLinModel():
             
             for n_iter in range(1, self.max_iter + 1):
                 if self.smoothing:
-                    # This can be done in a less cludgy way
+                    # This should be done in a less cludgy way
                     if n_iter == 1:
                         prev_lower_bound = lower_bound
                     else:    

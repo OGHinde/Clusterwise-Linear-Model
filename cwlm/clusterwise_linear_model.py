@@ -2,10 +2,10 @@
 
 @author: oghinde
 
-TO DO:
-    - Propper use of RandomState. 
+TODO:
     - Implement parallelization with MPI.
     - Implement other input covariances.
+    - Update Attributes docstring.
 
 ISSUES:
     - Weirdness in the lower bound results indicates that something's not

@@ -1,6 +1,7 @@
 """CLUSTERWISE LINEAR REGRESSION MODEL
 
-@author: oghinde
+    Author: Óscar García Hinde <oghinde@tsc.uc3m.es>
+    Python Version: 3.6
 
 TODO:
     - Implement parallelization with MPI.
@@ -393,6 +394,7 @@ class ClusterwiseLinModel():
             reg_precisions = initializer.reg_precisions_
         
         elif self.init_params == 'random':
+            # This tends to work like crap
             resp = RandomState.rand(n, self.n_components)
             resp /= resp.sum(axis=1)[:, np.newaxis]
             reg_weights = RandomState.randn(d + 1, self.n_components)
@@ -444,7 +446,6 @@ class ClusterwiseLinModel():
         # Check shape of y and fix if needed
         if y.shape != (n, 1):
             y.shape = (n, 1)
-        # Initialise random number generator
         rng = RandomState(self.random_seed)
 
         for init in range(self.n_init):            
@@ -455,7 +456,7 @@ class ClusterwiseLinModel():
 
             for n_iter in range(1, self.max_iter + 1):
                 if self.smoothing:
-                    # This should be done in a less cludgy way
+                    # TODO: This should be done in a less cludgy way
                     if n_iter == 1:
                         prev_lower_bound = lower_bound
                     else:    

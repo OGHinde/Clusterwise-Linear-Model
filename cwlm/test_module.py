@@ -5,6 +5,8 @@ Created on Fri Apr 28 11:51:46 2017
 
 @author: oghinde
 
+This should be rewritten as a notebook.
+
 Check these githubs:
     https://github.com/tansey/regression_mixtures
     https://github.com/victorkristof/linear-regressions-mixture

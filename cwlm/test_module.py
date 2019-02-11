@@ -15,7 +15,7 @@ This should go in a notebook.
 """
 # Add our module to the path
 import sys
-sys.path.append('/Users/oghinde/Dropbox/Work/Clusterwise_LM/code/')
+sys.path.append('/Users/oghinde/Dropbox/Work/Clusterwise_LM/model/')
 
 import numpy as np
 from cwlm.clusterwise_linear_model import ClusterwiseLinModel as CWLM

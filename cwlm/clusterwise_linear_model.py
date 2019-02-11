@@ -16,6 +16,7 @@ NEXT STEPS:
 """
 
 import numpy as np
+from numpy.random import RandomState
 from scipy import linalg
 from scipy.stats import norm
 from scipy.misc import logsumexp
@@ -248,8 +249,8 @@ def _estimate_regression_weights(X, y, resp_k, reg_term_k):
 class ClusterwiseLinModel():
     """Clusterwise Linear Regressor Mixture.
 
-    Representation of a coupled Gaussian mixture and linear regressor mixture
-    model probability distribution.
+    Representation of a coupled Gaussian and linear regression
+    mixture probability distribution.
     
     This class estimates the parameters of said mixture distribution using
     the EM algorithm.
@@ -310,8 +311,9 @@ class ClusterwiseLinModel():
         The user-provided initial precisions.
         (The precision is the inverse of the label noise variance).
 
-    random_state : RandomState or an int seed, defaults to None.
-        A random number generator instance.
+    random_seed : int, defaults to None.
+        The random number generator seed. To be used when init_params is set 
+        to 'random'.
 
     plot : bool, defaults to False.
         Enable plotting of the lower bound's evolution for each initialisation.
@@ -343,7 +345,7 @@ class ClusterwiseLinModel():
                  max_iter=200, n_init=10, init_params='gmm', smoothing=False, 
                  smooth_window=20, weights_init=None, means_init=None, 
                  covariances_init=None, reg_weights_init=None, reg_precisions_init=None, 
-                 random_state=None, plot=False):
+                 random_seed=None, plot=False):
         self.weights_init = weights_init                # Pi_k in the notes
         self.means_init = means_init                    # mu_k in the notes
         self.covariances_init = covariances_init        # Sigma_k in the notes              
@@ -358,10 +360,10 @@ class ClusterwiseLinModel():
         self.init_params = init_params
         self.smoothing = smoothing
         self.smooth_window = smooth_window
-        self.random_state = random_state                # Not used atm.
+        self.random_seed = random_seed
         self.plot = plot
 
-    def _initialise(self, X, y):
+    def _initialise(self, X, y, RandomState):
         """Initialization of the Clusterwise Linear Model parameters.
 
         In this version we'll implement all options: 'kmeans', 'gmm' and 'random'.
@@ -372,8 +374,9 @@ class ClusterwiseLinModel():
 
         resp : array-like, shape (n_samples, n_components)
         """
-        n, d = X.shape
         
+        n, d = X.shape
+
         if self.init_params == 'kmeans':
             initializer = KMeansRegressor(n_components=self.n_components, alpha=self.eta)
             initializer.fit(X, y)
@@ -390,9 +393,9 @@ class ClusterwiseLinModel():
             reg_precisions = initializer.reg_precisions_
         
         elif self.init_params == 'random':
-            resp = random_state.rand(n, self.n_components)
+            resp = RandomState.rand(n, self.n_components)
             resp /= resp.sum(axis=1)[:, np.newaxis]
-            reg_weights = random_state.rand(n_features, self.n_components)
+            reg_weights = RandomState.randn(d + 1, self.n_components)
             reg_precisions = np.zeros((self.n_components, )) + 1 / np.var(y)
 
         else:
@@ -438,18 +441,18 @@ class ClusterwiseLinModel():
         n, d = X.shape
         max_lower_bound = -np.infty
         self.converged_ = False
-        
         # Check shape of y and fix if needed
         if y.shape != (n, 1):
             y.shape = (n, 1)
+        # Initialise random number generator
+        rng = RandomState(self.random_seed)
 
-        for init in range(self.n_init):
-            
+        for init in range(self.n_init):            
             lower_bound = -np.infty
-            self._initialise(X, y)
+            self._initialise(X, y, rng)
             bound_curve = []
             smooth_bound_curve = []
-            
+
             for n_iter in range(1, self.max_iter + 1):
                 if self.smoothing:
                     # This should be done in a less cludgy way

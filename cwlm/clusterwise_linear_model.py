@@ -590,7 +590,7 @@ class ClusterwiseLinModel():
         X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
 
         # Regularization term (equivalent to Gaussian prior on the regression weights)
-        reg_term = float(self.eta) / (self.reg_precisions_ + eps)
+        reg_term = self.eta / (self.reg_precisions_ + eps)
         
         # Update the mixture weights
         weights = resp.sum(axis=0) + eps

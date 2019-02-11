@@ -270,10 +270,10 @@ class ClusterwiseLinModel():
         Non-negative regularization added to the diagonal of covariance.
         Allows to assure that the covariance matrices are all positive.
 
-    max_iter : int, defaults to 100.
+    max_iter : int, defaults to 200.
         The number of EM iterations to perform.
 
-    n_init : int, defaults to 1.
+    n_init : int, defaults to 10.
         The number of EM initializations to perform. The best results are kept.
 
     init_params : str, defaults to 'gmm'.
@@ -282,6 +282,13 @@ class ClusterwiseLinModel():
             'gmm' : a Gaussian mixture + Ridge Regression model is used.
             'kmeans' : a K-Means + Ridge Regression model is used.
             'random' : weights are initialized randomly.
+    
+    smoothing : bool, defaults to False.
+        Wether or not to perform average smoothing on the evolution  of the 
+        lower bound. Can help converge quicker in ill conditioned databases.
+
+    smooth_window : int, defaults to 20.
+        The averaging window size in case lower bound smoothing is used.
 
     weights_init : array-like, shape (n_components, ), optional
         The user-provided initial weights, defaults to None.
@@ -305,6 +312,9 @@ class ClusterwiseLinModel():
 
     random_state : RandomState or an int seed, defaults to None.
         A random number generator instance.
+
+    plot : bool, defaults to False.
+        Enable plotting of the lower bound's evolution for each initialisation.
 
     Attributes
     ----------
@@ -330,10 +340,10 @@ class ClusterwiseLinModel():
     """
 
     def __init__(self, n_components=5, eta=1, tol=1e-10, reg_covar=1e-6,
-                 max_iter=200, n_init=20, init_params='kmeans', smoothing=False, 
+                 max_iter=200, n_init=10, init_params='gmm', smoothing=False, 
                  smooth_window=20, weights_init=None, means_init=None, 
                  covariances_init=None, reg_weights_init=None, reg_precisions_init=None, 
-                 random_state=None, warm_start=False, verbose=0, verbose_interval=10, plot=False):
+                 random_state=None, plot=False):
         self.weights_init = weights_init                # Pi_k in the notes
         self.means_init = means_init                    # mu_k in the notes
         self.covariances_init = covariances_init        # Sigma_k in the notes              
@@ -349,9 +359,6 @@ class ClusterwiseLinModel():
         self.smoothing = smoothing
         self.smooth_window = smooth_window
         self.random_state = random_state                # Not used atm.
-        self.warm_start = warm_start
-        self.verbose = verbose
-        self.verbose_interval = verbose_interval
         self.plot = plot
 
     def _initialise(self, X, y):
@@ -417,8 +424,6 @@ class ClusterwiseLinModel():
         
         Each initialization of the algorithm runs until convergence or max_iter
         times.
-        
-        If we enable warm_start, we will have a unique initialisation. 
 
         Parameters
         ----------

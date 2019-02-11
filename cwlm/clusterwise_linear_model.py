@@ -4,9 +4,8 @@
 
 TO DO:
     - Propper use of RandomState. 
-    - Check that initializations aren't screwing us over.
-    - Implement other input covariances.
     - Implement parallelization with MPI.
+    - Implement other input covariances.
 
 ISSUES:
     - Weirdness in the lower bound results indicates that something's not
@@ -255,15 +254,13 @@ class ClusterwiseLinModel():
     This class estimates the parameters of said mixture distribution using
     the EM algorithm.
     
-    This is a simplified version for debugging purposes. It assumes only a 
-    full (general) covariance matrix for the input space mixture model.
-    
-    We are also not using sklearn's base mixture class.
-
     Parameters
     ----------
-    n_components : int,  defaults to 1.
+    n_components : int,  defaults to 5.
         The number of mixture components.
+
+    eta : int, defaults to 1.
+        The regression L2 regularization term
 
     tol : float, defaults to 1e-10.
         The convergence threshold. EM iterations will stop when the
@@ -332,7 +329,7 @@ class ClusterwiseLinModel():
 
     """
 
-    def __init__(self, n_components=8, eta=1, tol=1e-10, reg_covar=1e-6,
+    def __init__(self, n_components=5, eta=1, tol=1e-10, reg_covar=1e-6,
                  max_iter=200, n_init=20, init_params='kmeans', smoothing=False, 
                  smooth_window=20, weights_init=None, means_init=None, 
                  covariances_init=None, reg_weights_init=None, reg_precisions_init=None, 

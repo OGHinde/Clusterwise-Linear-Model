@@ -1,5 +1,7 @@
 """GAUSSIAN MIXTURE REGRESSION
 
+
+
 @author: oghinde
 """
 
@@ -9,7 +11,63 @@ from sklearn.mixture import GaussianMixture as GMM
 from sklearn.metrics import r2_score
 
 class GMMRegressor(object):
+    """Linear regression on Gaussian Mixture components.
+
+    Combination of a Gaussian mixture model for input clustering with a 
+    per-component linear regression.
     
+    Te likelyhoods for each sample are used as sample-weights in the 
+    reggression stage.
+
+    Parameters
+    ----------
+    n_components : int,  defaults to 1.
+        The number of mixture components.
+
+    alpha : int, defaults to 1.
+        The regression L2 regularization term
+
+    n_init : int, defaults to 1.
+        The number of EM initializations to perform. The best results are kept.
+
+    covariance_type : {'full' (default), 'tied', 'diag', 'spherical'}
+        String describing the type of covariance parameters to use.
+        Must be one of:
+
+        'full'
+            each component has its own general covariance matrix
+        'tied'
+            all components share the same general covariance matrix
+        'diag'
+            each component has its own diagonal covariance matrix
+        'spherical'
+            each component has its own single variance
+
+    Attributes
+    ----------
+
+    TODO
+
+    weights_ : array-like, shape (n_components, )
+        The weights of each mixture components.
+
+    reg_weights_ : array-like, shape ( n_features + 1, n_components)
+        The linear regressor weights fo each mixture component.
+
+    precisions_ : array-like, shape (n_components, )
+        The precisions of each mixture component. The precision is the inverse 
+        of the variance. 
+
+    converged_ : bool
+        True when convergence was reached in fit(), False otherwise.
+
+    n_iter_ : int
+        Number of step used by the best fit of EM to reach the convergence.
+
+    lower_bound_ : float
+        Log-likelihood of the best fit of EM.
+
+    """
     def __init__(self, n_components=8, alpha=1, n_init=20, covariance_type='diag', verbose=0):
         self.n_components_ = n_components
         self.alpha_ = alpha

@@ -1,14 +1,43 @@
 """GAUSSIAN MIXTURE REGRESSION
 
-
-
-@author: oghinde
+    Author: Óscar García Hinde <oghinde@tsc.uc3m.es>
+    Python Version: 3.6
 """
 
 import numpy as np
 from scipy.linalg import solve
 from sklearn.mixture import GaussianMixture as GMM
+from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
+
+def _estimate_regression_weights(X, y, resp_k, alpha):
+    """Estimate the regression weights for the output space for component k.
+
+    Parameters
+    ----------
+    X : array-like, shape (n_samples, n_features)
+
+    y : array-like, shape (n_samples, )
+
+    resp_k : array-like, shape (n_samples, )
+
+    alpha : float
+
+    Returns
+    -------
+    reg_weights : array, shape (n_features, )
+        The regression weights for component k.
+    """
+    _, d = X.shape
+    eps = 10 * np.finfo(resp_k.dtype).eps
+    reg_weights_k = np.zeros((d+1,))
+    
+    solver = Ridge(alpha=alpha)
+    solver.fit(X, y, sample_weight=resp_k + eps)
+    reg_weights_k[0] = solver.intercept_
+    reg_weights_k[1:] = solver.coef_
+
+    return reg_weights_k
 
 class GMMRegressor(object):
     """Linear regression on Gaussian Mixture components.
@@ -69,34 +98,39 @@ class GMMRegressor(object):
 
     """
     def __init__(self, n_components=8, alpha=1, n_init=20, covariance_type='diag', verbose=0):
-        self.n_components_ = n_components
-        self.alpha_ = alpha
+        self.n_components = n_components
+        self.alpha = alpha
         self.covariance_type = covariance_type
         self.n_init = n_init
         self.verbose = verbose
         
-    def fit(self, X_tr, y_tr):
+    def fit(self, X, y):
         self.is_fitted_ = False
-        eps = np.finfo(float).eps
-        n, d = X_tr.shape
+        eps = 10 * np.finfo(float).eps
+        n, d = X.shape
         
         # Determine training sample/component posterior probability
-        gmm = GMM(n_components=self.n_components_, n_init=self.n_init)
-        gmm.fit(X_tr)
-        resp_tr = gmm.predict_proba(X_tr)
+        gmm = GMM(n_components=self.n_components, n_init=self.n_init)
+        gmm.fit(X)
+        resp_tr = gmm.predict_proba(X)
         
         # Calculate weights conditioned on posterior probabilities
-        reg_weights = np.zeros((d+1, self.n_components_))
-        X_ext = np.concatenate((np.ones((n, 1)), X_tr), axis=1)
-        for k in range(self.n_components_):
-            R_k = np.diag(resp_tr[:, k] + eps)
-            R_kX = R_k.dot(X_ext)
-            L = R_kX.T.dot(X_ext) + np.eye(d+1) * self.alpha_
-            R = R_kX.T.dot(y_tr)
-            reg_weights[:, k] = np.squeeze(solve(L, R, sym_pos=True))
+        reg_weights = np.zeros((d+1, self.n_components))
+        X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
+        for k in range(self.n_components):
+            
+            #R_k = np.diag(resp_tr[:, k] + eps)
+            #R_kX = R_k.dot(X_ext)
+            #L = R_kX.T.dot(X_ext) + np.eye(d+1) * self.alpha
+            #R = R_kX.T.dot(y)
+            #reg_weights[:, k] = np.squeeze(solve(L, R, sym_pos=True))
+
+            reg_weights[:, k] = _estimate_regression_weights(X, y, 
+                resp_k=resp_tr[:, k], alpha=self.alpha)
+
 
         means = np.dot(X_ext, reg_weights)
-        err = (np.tile(y_tr[:, np.newaxis], (1, self.n_components_)) - means) ** 2
+        err = (np.tile(y[:, np.newaxis], (1, self.n_components)) - means) ** 2
         reg_precisions = n * gmm.weights_ / np.sum(resp_tr * err)
 
         self.resp_ = resp_tr 
@@ -106,15 +140,15 @@ class GMMRegressor(object):
         self.is_fitted = True
         return resp_tr
     
-    def predict(self, X_tst):
+    def predict(self, X):
         if self.is_fitted:
-            n, d = X_tst.shape
+            n, d = X.shape
         
             # Determine test sample/component posterior probability
-            resp_tst = self.gmm_.predict_proba(X_tst)
+            resp_tst = self.gmm_.predict_proba(X)
         
             # Predict test targets
-            X_ext = np.concatenate((np.ones((n, 1)), X_tst), axis=1)
+            X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
             dot_prod = np.dot(X_ext, self.reg_weights_)
             targets = np.sum(resp_tst * dot_prod, axis=1)
 
@@ -123,12 +157,12 @@ class GMMRegressor(object):
             print("Model isn't fitted.")
             return
     
-    def fit_predict(self, X_tr, y_tr, X_tst):
-        self.fit(X_tr, y_tr)
-        targets = self.predict(X_tst)
+    def fit_predict(self, X, y, X):
+        self.fit(X, y)
+        targets = self.predict(X)
         return targets
     
-    def score(self, X_tst, y_tst):
-        targets = self.predict(X_tst)
-        score = r2_score(y_tst, targets)
+    def score(self, X, y):
+        targets = self.predict(X)
+        score = r2_score(y, targets)
         return  score

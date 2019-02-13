@@ -4,6 +4,7 @@
     Python Version: 3.6
 
 TODO:
+    - Multioutput.
     - Implement parallelization with MPI.
     - Implement other input covariances.
     - Update Attributes docstring.
@@ -26,8 +27,7 @@ from sklearn.linear_model import Ridge
 from cwlm.kmeans_regressor import KMeansRegressor
 from cwlm.gmm_regressor import GMMRegressor
 
-import time
-import multiprocessing
+from mpi4py import MPI
 
 import warnings
 from sklearn.exceptions import ConvergenceWarning
@@ -682,7 +682,7 @@ class ClusterwiseLinModel():
             score = mean_squared_error(y, y_)
         elif metric == 'R2': 
             score = r2_score(y, y_)
-        elif metric == 'MAE': 
+        elif metric == 'MAE':
             score = mean_absolute_error(y, y_)    
         elif metric == 'all': 
             score = [r2_score(y, y_), mean_squared_error(y, y_), mean_absolute_error(y, y_)]

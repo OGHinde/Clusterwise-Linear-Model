@@ -97,7 +97,7 @@ class GMMRegressor(object):
         Log-likelihood of the best fit of EM.
 
     """
-    def __init__(self, n_components=8, alpha=1, n_init=20, covariance_type='diag', verbose=0):
+    def __init__(self, n_components=8, alpha=1, n_init=10, covariance_type='diag', verbose=0):
         self.n_components = n_components
         self.alpha = alpha
         self.covariance_type = covariance_type
@@ -123,7 +123,7 @@ class GMMRegressor(object):
             #R_kX = R_k.dot(X_ext)
             #L = R_kX.T.dot(X_ext) + np.eye(d+1) * self.alpha
             #R = R_kX.T.dot(y)
-            #reg_weights[:, k] = np.squeeze(solve(L, R, sym_pos=True))
+            #reg_weights[:, k] = np.squeeze(solve(L, R, sym_pos=True))  
 
             reg_weights[:, k] = _estimate_regression_weights(X, y, 
                 resp_k=resp_tr[:, k], alpha=self.alpha)
@@ -157,9 +157,9 @@ class GMMRegressor(object):
             print("Model isn't fitted.")
             return
     
-    def fit_predict(self, X, y, X):
-        self.fit(X, y)
-        targets = self.predict(X)
+    def fit_predict(self, X_tr, y_tr, X_tst):
+        self.fit(X_tr, y_tr)
+        targets = self.predict(X_tst)
         return targets
     
     def score(self, X, y):

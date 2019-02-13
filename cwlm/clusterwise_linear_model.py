@@ -387,7 +387,8 @@ class ClusterwiseLinModel():
             reg_precisions = initializer.reg_precisions_
 
         elif self.init_params == 'gmm':
-            initializer = GMMRegressor(n_components=self.n_components, alpha=self.eta, covariance_type='full')
+            initializer = GMMRegressor(n_components=self.n_components, alpha=self.eta, 
+                n_init=1, covariance_type='full')
             initializer.fit(X, y)
             resp = initializer.resp_
             reg_weights = initializer.reg_weights_

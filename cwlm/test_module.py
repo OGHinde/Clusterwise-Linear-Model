@@ -104,7 +104,7 @@ if save_figs:
 # CWLM MODEL TRAINING
 K = 3
 cwlm = CWLM(n_components=K, eta=7, plot=True, n_init=10, tol=1e-10, 
-            init_params='kmeans', smoothing=False)
+            init_params='gmm', smoothing=False)
 cwlm.fit(X, y)
 mu_est = cwlm.means_
 mu_ext = np.concatenate((np.ones((K, 1)), mu_est), axis=1)

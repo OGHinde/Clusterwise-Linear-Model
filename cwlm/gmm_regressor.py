@@ -137,7 +137,7 @@ class GMMRegressor(object):
         return t, n, d
 
     def fit(self, X, y):
-        
+
         self.is_fitted_ = False
         t, n, d = self._check_data(X, y)
         eps = 10 * np.finfo(float).eps
@@ -150,6 +150,7 @@ class GMMRegressor(object):
         # Calculate weights conditioned on posterior probabilities
         reg_weights = np.zeros((d+1, self.n_components))
         X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
+
         for k in range(self.n_components):
             
             #R_k = np.diag(resp_tr[:, k] + eps)
@@ -160,7 +161,6 @@ class GMMRegressor(object):
 
             reg_weights[:, k] = _estimate_regression_weights(X, y, 
                 resp_k=resp_tr[:, k], alpha=self.alpha)
-
 
         means = np.dot(X_ext, reg_weights)
         err = (np.tile(y[:, np.newaxis], (1, self.n_components)) - means) ** 2

@@ -104,10 +104,43 @@ class GMMRegressor(object):
         self.n_init = n_init
         self.verbose = verbose
         
+    def _check_data(X, y):
+        """Check that the input data is correctly formatted.
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+
+        y : array, shape (n_samples, n_targets)
+
+         Returns
+        -------
+        t : int
+            The total number of targets.
+        
+        n : int
+            The total number of samples.
+
+        d : int
+            The total number of features (dimensions)
+
+        """
+        n_x, d = X.shape
+        n_y, t = y.shape
+
+        if n_x == n_y:
+            n = n_x
+        else:
+            print('Data size error.')
+            sys.exit()
+
+        return t, n, d
+
     def fit(self, X, y):
+        
         self.is_fitted_ = False
+        t, n, d = self._check_data(X, y)
         eps = 10 * np.finfo(float).eps
-        n, d = X.shape
         
         # Determine training sample/component posterior probability
         gmm = GMM(n_components=self.n_components, n_init=self.n_init)

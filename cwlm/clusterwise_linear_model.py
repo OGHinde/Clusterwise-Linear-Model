@@ -5,6 +5,7 @@
 
 TODO:
     - Multioutput.
+    - Include MAPE performance metric.
     - Implement parallelization with MPI.
     - Implement other input covariances.
     - Update Attributes docstring.

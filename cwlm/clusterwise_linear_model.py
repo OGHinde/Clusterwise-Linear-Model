@@ -4,8 +4,8 @@
     Python Version: 3.6
 
 TODO:
-    - Multioutput.
     - Include MAPE performance metric.
+    - Multioutput.
     - Implement parallelization with MPI.
     - Implement other input covariances.
     - Update Attributes docstring.

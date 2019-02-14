@@ -3,6 +3,7 @@
 @author: oghinde
 """
 
+import sys
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.linear_model import Ridge
@@ -18,14 +19,55 @@ class KMeansRegressor(object):
         self.verbose = verbose
         for k in range(self.n_components_):
             self.regs_.append(Ridge(alpha=self.alpha_))
+    
+    def _check_data(X, y):
+        """Check that the input data is correctly formatted.
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+
+        y : array, shape (n_samples, n_targets)
+
+         Returns
+        -------
+        t : int
+            The total number of targets.
         
+        n : int
+            The total number of samples.
+
+        d : int
+            The total number of features (dimensions)
+
+        """
+        n_x, d = X.shape
+        n_y, t = y.shape
+
+        if n_x == n_y:
+            n = n_x
+        else:
+            print('Data size error.')
+            sys.exit()
+
+        return t, n, d
+
     def fit(self, X_tr, y_tr):
+        """TODO: 
+
+            Add docstring.
+            Complete multioutput.
+        """
+
+        t, n, d = self._check_data(X, y)
         self.is_fitted_ = False
-        n, d = X_tr.shape
+
         self.labels_ = self.kmeans_.fit_predict(X_tr)
-        reg_weights = np.zeros((d+1, self.n_components_))
-        reg_precisions = np.zeros((self.n_components_, ))
+        reg_weights = np.empty((t, d+1, self.n_components_))
+        reg_precisions = np.zeros((t, self.n_components_))
+
         for k in range(self.n_components_):
+
             idx = self.labels_ == k
             self.regs_[k].fit(X_tr[idx, :], y_tr[idx])
             reg_weights[1:, k] = self.regs_[k].coef_
@@ -33,6 +75,7 @@ class KMeansRegressor(object):
             reg_vars = np.var(y_tr[idx])
             eps = 10 * np.finfo(reg_vars.dtype).eps
             reg_precisions[k] = 1/(reg_vars + eps)
+
         self.reg_weights_ = reg_weights
         self.reg_precisions_ = reg_precisions
         self.is_fitted = True

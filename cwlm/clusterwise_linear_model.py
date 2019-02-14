@@ -364,6 +364,38 @@ class ClusterwiseLinModel():
         self.random_seed = random_seed
         self.plot = plot
 
+    def _check_data(X, y):
+        """Check that the input data is correctly formatted.
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+
+        y : array, shape (n_samples, n_targets)
+
+         Returns
+        -------
+        t : int
+            The total number of targets.
+        
+        n : int
+            The total number of samples.
+
+        d : int
+            The total number of features (dimensions)
+
+        """
+        n_x, d = X.shape
+        n_y, t = y.shape
+
+        if n_x == n_y:
+            n = n_x
+        else:
+            print('Data size error.')
+            sys.exit()
+
+        return t, n, d
+
     def _initialise(self, X, y, RandomState):
         """Initialization of the Clusterwise Linear Model parameters.
 
@@ -444,9 +476,10 @@ class ClusterwiseLinModel():
         n, d = X.shape
         max_lower_bound = -np.infty
         self.converged_ = False
-        # Check shape of y and fix if needed
-        if y.shape != (n, 1):
-            y.shape = (n, 1)
+        
+        t, n, d = self._check_data(X, y)
+        
+        # Summon the Random Number Gods
         rng = RandomState(self.random_seed)
 
         for init in range(self.n_init):            

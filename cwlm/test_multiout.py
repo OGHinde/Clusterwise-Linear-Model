@@ -36,15 +36,7 @@ for k in range(K):
     idx = (labels == k)
     y[idx, :] = intercepts[k] + np.dot(X[idx, :], coefs[k].T) + np.random.randn(sum(idx), t)
 
-
-
-
 reg = Ridge()
 reg.fit(X, y)
 
-
-
-print('Real intercept = ', intercept)
-print('Estimated intercept = ', reg.intercept_)
-print('Real coef = ', coef)
-print('Estimated coef = ', reg.coef_)
+Kreg = KMeansRegressor(n_components=K)

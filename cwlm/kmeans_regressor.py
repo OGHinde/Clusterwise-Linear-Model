@@ -10,11 +10,11 @@ from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
 
 class KMeansRegressor(object):
-    
-    def __init__(self, n_components=8, alpha=1, verbose=False):
+    def __init__(self, n_components=8, alpha=1, n_init=10, verbose=False):
         self.n_components_ = n_components
         self.alpha_ = alpha
-        self.kmeans_ = KMeans(n_clusters=self.n_components_)
+        self.n_init = n_init
+        self.kmeans_ = KMeans(n_clusters=self.n_components_, n_init=n_init)
         self.verbose = verbose
         self.regs_ = []
         for k in range(self.n_components_):

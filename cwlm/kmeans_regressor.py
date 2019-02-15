@@ -15,12 +15,12 @@ class KMeansRegressor(object):
         self.n_components_ = n_components
         self.alpha_ = alpha
         self.kmeans_ = KMeans(n_clusters=self.n_components_)
-        self.regs_ = list()
         self.verbose = verbose
+        self.regs_ = []
         for k in range(self.n_components_):
             self.regs_.append(Ridge(alpha=self.alpha_))
     
-    def _check_data(X, y):
+    def _check_data(self, X, y):
         """Check that the input data is correctly formatted.
 
         Parameters
@@ -29,7 +29,7 @@ class KMeansRegressor(object):
 
         y : array, shape (n_samples, n_targets)
 
-         Returns
+        Returns
         -------
         t : int
             The total number of targets.
@@ -41,40 +41,47 @@ class KMeansRegressor(object):
             The total number of features (dimensions)
 
         """
+
+        if y.ndim == 1:
+            y = y[:, np.newaxis]
+
         n_x, d = X.shape
         n_y, t = y.shape
 
         if n_x == n_y:
             n = n_x
         else:
-            print('Data size error.')
+            print('Data size error. Number of samples in X and y must match:')
+            print('X n_samples = {}, y n_samples = {}'.format(n_x, n_y))
+            print('Exiting.')
             sys.exit()
 
-        return t, n, d
+        return t, n, d, X, y
+
 
     def fit(self, X_tr, y_tr):
         """TODO: 
-
-            Add docstring.
-            Complete multioutput.
+                - Add docstring.
+                - Complete multioutput.
         """
 
-        t, n, d = self._check_data(X, y)
+        t, n, d, X_tr, y_tr = self._check_data(X_tr, y_tr)
         self.is_fitted_ = False
 
         self.labels_ = self.kmeans_.fit_predict(X_tr)
+
         reg_weights = np.empty((t, d+1, self.n_components_))
         reg_precisions = np.zeros((t, self.n_components_))
 
         for k in range(self.n_components_):
 
-            idx = self.labels_ == k
-            self.regs_[k].fit(X_tr[idx, :], y_tr[idx])
-            reg_weights[1:, k] = self.regs_[k].coef_
-            reg_weights[0, k] = self.regs_[k].intercept_
-            reg_vars = np.var(y_tr[idx])
+            idx = (self.labels_ == k)
+            self.regs_[k].fit(X_tr[idx, :], y_tr[idx, :])
+            reg_weights[:, 0, k] = self.regs_[k].intercept_
+            reg_weights[:, 1:, k] = self.regs_[k].coef_
+            reg_vars = np.var(y_tr[idx, :], axis=0)
             eps = 10 * np.finfo(reg_vars.dtype).eps
-            reg_precisions[k] = 1/(reg_vars + eps)
+            reg_precisions[:, k] = 1/(reg_vars + eps)
 
         self.reg_weights_ = reg_weights
         self.reg_precisions_ = reg_precisions
@@ -90,7 +97,7 @@ class KMeansRegressor(object):
         labels_tst = self.kmeans_.predict(X_tst)
         targets = np.zeros_like(labels_tst)
         for k in range(self.n_components_):
-            idx = labels_tst == k
+            idx = (labels_tst == k)
             if sum(idx) != 0:
                 targets[idx] = np.squeeze(self.regs_[k].predict(X_tst[idx, :]))
             else:

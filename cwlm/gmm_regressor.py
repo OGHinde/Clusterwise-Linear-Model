@@ -113,7 +113,7 @@ class GMMRegressor(object):
 
         y : array, shape (n_samples, n_targets)
 
-         Returns
+        Returns
         -------
         t : int
             The total number of targets.
@@ -125,21 +125,27 @@ class GMMRegressor(object):
             The total number of features (dimensions)
 
         """
+
+        if y.ndim == 1:
+            y = y[:, np.newaxis]
+
         n_x, d = X.shape
         n_y, t = y.shape
 
         if n_x == n_y:
             n = n_x
         else:
-            print('Data size error.')
+            print('Data size error. Number of samples in X and y must match:')
+            print('X n_samples = {}, y n_samples = {}'.format(n_x, n_y))
+            print('Exiting.')
             sys.exit()
 
-        return t, n, d
+        return t, n, d, X, y
 
     def fit(self, X, y):
 
         self.is_fitted_ = False
-        t, n, d = self._check_data(X, y)
+        t, n, d, X, y = self._check_data(X, y)
         eps = 10 * np.finfo(float).eps
         
         # Determine training sample/component posterior probability

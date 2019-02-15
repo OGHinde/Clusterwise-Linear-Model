@@ -305,11 +305,11 @@ class ClusterwiseLinModel():
         The user-provided initial precisions (inverse of the covariance matrices)
         for the Gaussian Mixture model at input space.
         
-    reg_weights_init : array-like, shape (n_components, n_features + 1), optional
+    reg_weights_init : array-like, shape (n_tasks, n_components, n_features + 1), optional
         The user-provided initial means, defaults to None,
         If it None, means are initialized using the `init_params` method.
     
-    reg_precisions_init : array-like, shape (n_components, ), optional.
+    reg_precisions_init : array-like, shape (n_tasks, n_components), optional.
         The user-provided initial precisions.
         (The precision is the inverse of the label noise variance).
 
@@ -374,7 +374,7 @@ class ClusterwiseLinModel():
 
         y : array, shape (n_samples, n_targets)
 
-         Returns
+        Returns
         -------
         t : int
             The total number of targets.
@@ -386,16 +386,22 @@ class ClusterwiseLinModel():
             The total number of features (dimensions)
 
         """
+
+        if y.ndim == 1:
+            y = y[:, np.newaxis]
+
         n_x, d = X.shape
         n_y, t = y.shape
 
         if n_x == n_y:
             n = n_x
         else:
-            print('Data size error.')
+            print('Data size error. Number of samples in X and y must match:')
+            print('X n_samples = {}, y n_samples = {}'.format(n_x, n_y))
+            print('Exiting.')
             sys.exit()
 
-        return t, n, d
+        return t, n, d, X, y
 
     def _initialise(self, X, y, RandomState):
         """Initialization of the Clusterwise Linear Model parameters.
@@ -478,7 +484,7 @@ class ClusterwiseLinModel():
         max_lower_bound = -np.infty
         self.converged_ = False
         
-        t, n, d = self._check_data(X, y)
+        t, n, d, X, y = self._check_data(X, y)
         
         # Summon the Random Number Gods
         rng = RandomState(self.random_seed)

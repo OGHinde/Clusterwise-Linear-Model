@@ -52,7 +52,7 @@ class KMeansRegressor(object):
             n = n_x
         else:
             print('Data size error. Number of samples in X and y must match:')
-            print('X n_samples = {}, y n_samples = {}'.format(n_x, n_y))
+            print('X n_samples = %d, y n_samples = %d'%(n_x, n_y))
             print('Exiting.')
             sys.exit()
 
@@ -94,15 +94,17 @@ class KMeansRegressor(object):
             return
 
         n, d = X_tst.shape
+        t, _ = self.reg_precisions_.shape
+
         labels_tst = self.kmeans_.predict(X_tst)
-        targets = np.zeros_like(labels_tst)
+        targets = np.empty((n, t))
         for k in range(self.n_components_):
             idx = (labels_tst == k)
             if sum(idx) != 0:
-                targets[idx] = np.squeeze(self.regs_[k].predict(X_tst[idx, :]))
+                targets[idx, :] = self.regs_[k].predict(X_tst[idx, :])
             else:
                 if self.verbose:
-                    print("Empty cluster")
+                    print("No test samples in cluster %d"%k)
                 pass
         self.labels_tst = labels_tst
         self.targets = targets

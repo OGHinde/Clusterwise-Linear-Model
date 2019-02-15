@@ -28,7 +28,7 @@ def compute_targets(X, coefs, intercepts, noise_var=0.5):
 n_tr = 500  # number of training samples
 n_tst = 100 # number of testsamples
 d = 1       # number of input dimensions
-t = 3       # number of tasks
+t = 1       # number of tasks
 K = 2       # number of clusters
 plot = True
 
@@ -65,27 +65,18 @@ for k in range(K):
     y_tst[idx_tst, :] = compute_targets(X_tst[idx_tst, :], 
          coefs[:, :, k], intercepts[:, k])
 
-if plot:
-    for task in range(t):
-        for k in range(K):
-            idx = labels_tr == k
-            plt.scatter(X_tr[idx, :], y_tr[idx, task])
-        plt.title('Training data for task %d'%task)
-        plt.show()
-
 Kreg = KMeansRegressor(n_components=K)
 y_ = Kreg.fit_predict(X_tr, y_tr, X_tst)
 
 est_weights = Kreg.reg_weights_
 
-for task in range(t):
-    for k in range(K):
-        idx = labels_tr == k
-        aux_y = compute_targets(X_tr[idx, :], 
-                                est_weights[:, 1:, k], 
-                                est_weights[:, 0, k],
-                                noise_var=0)
-        plt.scatter(X_tr[idx, :], y_tr[idx, task])
-        plt.plot(X_tr[idx, :], aux_y[:, task], 'r')
-    plt.title('Fitted model for task %d'%task)
-    plt.show()
+if plot:
+    for task in range(t):
+        for k in range(K):
+            idx = labels_tr == k
+            aux_y = compute_targets(X_tr[idx, :], est_weights[:, 1:, k], 
+                                est_weights[:, 0, k], noise_var=0)
+            plt.scatter(X_tr[idx, :], y_tr[idx, task])
+            plt.plot(X_tr[idx, :], aux_y[:, task], 'r')
+        plt.title('Fitted model for task %d'%task)
+        plt.show()

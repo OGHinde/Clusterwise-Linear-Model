@@ -65,8 +65,8 @@ class KMeansRegressor(object):
                 - Complete multioutput.
         """
 
-        t, n, d, X_tr, y_tr = self._check_data(X_tr, y_tr)
         self.is_fitted_ = False
+        t, n, d, X_tr, y_tr = self._check_data(X_tr, y_tr)
 
         self.labels_ = self.kmeans_.fit_predict(X_tr)
 
@@ -83,8 +83,8 @@ class KMeansRegressor(object):
             eps = 10 * np.finfo(reg_vars.dtype).eps
             reg_precisions[:, k] = 1/(reg_vars + eps)
 
-        self.reg_weights_ = reg_weights
-        self.reg_precisions_ = reg_precisions
+        self.reg_weights_ = reg_weights.squeeze()
+        self.reg_precisions_ = reg_precisions.squeeze()
         self.is_fitted = True
         self.cluster_centers_ = self.kmeans_.cluster_centers_
     

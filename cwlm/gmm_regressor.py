@@ -10,7 +10,7 @@ from sklearn.mixture import GaussianMixture as GMM
 from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
 
-def _estimate_regression_weights(X, y, resp_k, alpha):
+def _estimate_regression_weights_k(X, y, resp_k, alpha):
     """Estimate the regression weights for the output space for component k.
 
     Parameters
@@ -28,16 +28,23 @@ def _estimate_regression_weights(X, y, resp_k, alpha):
     reg_weights : array, shape (n_features, )
         The regression weights for component k.
     """
-    _, d = X.shape
+    n, d = X.shape
+    _, t = y.shape
     eps = 10 * np.finfo(resp_k.dtype).eps
-    reg_weights_k = np.zeros((d+1,))
-    
+    X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
+    reg_weights_k = np.empty((t, d+1))
+    reg_precisions_k = np.empty((t, ))
+
     solver = Ridge(alpha=alpha)
     solver.fit(X, y, sample_weight=resp_k + eps)
-    reg_weights_k[0] = solver.intercept_
-    reg_weights_k[1:] = solver.coef_
+    reg_weights_k[:, 0] = solver.intercept_
+    reg_weights_k[:, 1:] = solver.coef_
 
-    return reg_weights_k
+    means = np.dot(X_ext, reg_weights_k.T)
+    err = (y - means) ** 2
+    reg_precisions_k = n * gmm.weights_ / np.sum(resp[:, np.newaxis] * err)
+
+    return reg_weights_k, reg_precisions_k
 
 class GMMRegressor(object):
     """Linear regression on Gaussian Mixture components.
@@ -104,7 +111,7 @@ class GMMRegressor(object):
         self.n_init = n_init
         self.verbose = verbose
         
-    def _check_data(X, y):
+    def _check_data(self, X, y):
         """Check that the input data is correctly formatted.
 
         Parameters
@@ -148,36 +155,30 @@ class GMMRegressor(object):
         t, n, d, X, y = self._check_data(X, y)
         eps = 10 * np.finfo(float).eps
         
+        
         # Determine training sample/component posterior probability
         gmm = GMM(n_components=self.n_components, n_init=self.n_init)
         gmm.fit(X)
-        resp_tr = gmm.predict_proba(X)
+        resp = gmm.predict_proba(X)
         
-        # Calculate weights conditioned on posterior probabilities
-        reg_weights = np.zeros((d+1, self.n_components))
-        X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
-
+        # Calculate regression weights & precisions conditioned on 
+        # posterior probabilities
+        reg_weights = np.empty((t, d+1, self.n_components))
+        reg_precisions = np.zeros((t, self.n_components))
         for k in range(self.n_components):
             
-            #R_k = np.diag(resp_tr[:, k] + eps)
-            #R_kX = R_k.dot(X_ext)
-            #L = R_kX.T.dot(X_ext) + np.eye(d+1) * self.alpha
-            #R = R_kX.T.dot(y)
-            #reg_weights[:, k] = np.squeeze(solve(L, R, sym_pos=True))  
+            (reg_weights[:, :, k], 
+            reg_precisions[:, k]) = _estimate_regression_weights_k(X, y, 
+                resp_k=resp[:, k], alpha=self.alpha)
+            
+            
 
-            reg_weights[:, k] = _estimate_regression_weights(X, y, 
-                resp_k=resp_tr[:, k], alpha=self.alpha)
-
-        means = np.dot(X_ext, reg_weights)
-        err = (np.tile(y[:, np.newaxis], (1, self.n_components)) - means) ** 2
-        reg_precisions = n * gmm.weights_ / np.sum(resp_tr * err)
-
-        self.resp_ = resp_tr 
+        self.resp_ = resp 
         self.reg_precisions_ = reg_precisions
         self.reg_weights_ = reg_weights
         self.gmm_ = gmm
         self.is_fitted = True
-        return resp_tr
+        return resp
     
     def predict(self, X):
         if self.is_fitted:

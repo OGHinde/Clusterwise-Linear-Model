@@ -28,7 +28,7 @@ def compute_targets(X, coefs, intercepts, noise_var=0.5):
 n_tr = 500  # number of training samples
 n_tst = 100 # number of testsamples
 d = 1       # number of input dimensions
-t = 1       # number of tasks
+t = 2       # number of tasks
 K = 2       # number of clusters
 plot = True
 
@@ -65,10 +65,9 @@ for k in range(K):
     y_tst[idx_tst, :] = compute_targets(X_tst[idx_tst, :], 
          coefs[:, :, k], intercepts[:, k])
 
-Kreg = KMeansRegressor(n_components=K)
-y_ = Kreg.fit_predict(X_tr, y_tr, X_tst)
-
-est_weights = Kreg.reg_weights_
+model = KMeansRegressor(n_components=K)
+y_ = model.fit(X_tr, y_tr)
+est_weights = model.reg_weights_
 
 if plot:
     for task in range(t):

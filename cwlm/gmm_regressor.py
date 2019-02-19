@@ -10,7 +10,7 @@ from sklearn.mixture import GaussianMixture as GMM
 from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
 
-def _estimate_regression_weights_k(X, y, resp_k, alpha):
+def _estimate_regression_params_k(X, y, resp_k, alpha):
     """Estimate the regression weights for the output space for component k.
 
     Parameters
@@ -168,7 +168,7 @@ class GMMRegressor(object):
         for k in range(self.n_components):
             
             (reg_weights[:, :, k], 
-            reg_precisions[:, k]) = _estimate_regression_weights_k(X, y, 
+            reg_precisions[:, k]) = _estimate_regression_params_k(X, y, 
                 resp_k=resp[:, k], alpha=self.alpha)
             
             

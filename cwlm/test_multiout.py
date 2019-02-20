@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 # Add our module to the path
 import sys
-sys.path.append('/home/ru74c3/Git/Clusterwise_Linear_Model/Clusterwise_Linear_Model/')
+sys.path.append('/home/ru74c3/Git/Clusterwise_Linear_Model/')
 
 from cwlm.clusterwise_linear_model import ClusterwiseLinModel as CWLM
 from cwlm.gmm_regressor import GMMRegressor
@@ -72,6 +72,7 @@ print('Done')
 
 if plot:
     for task in range(t):
+        figure = plt.figure(task)
         for k in range(K):
             idx = labels_tr == k
             aux_y = compute_targets(X_tr[idx, :], est_weights[:, 1:, k], 

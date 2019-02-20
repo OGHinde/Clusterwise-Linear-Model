@@ -8,6 +8,7 @@ TODO:
     - Multioutput.
     - Implement parallelization with MPI.
     - Implement other input covariances.
+    - Revisit RandomState
     - Update Attributes docstring.
 
 ISSUES:
@@ -567,6 +568,8 @@ class ClusterwiseLinModel():
                           % (init + 1), ConvergenceWarning)
             #print('Model did not converge after %d initializations.'%(self.n_init))
 
+        self.n_tasks_ = t
+        self.n_input_dims_ = d
         self._set_parameters(best_params)
         self.n_iter_ = best_n_iter
         self.lower_bound_ = max_lower_bound
@@ -670,7 +673,15 @@ class ClusterwiseLinModel():
         -------
         y_ : array, shape (n_samples, 1)
         """
+        if not self.is_fitted: 
+            print("Model isn't fitted.")
+            return
+
         n, d = X.shape
+        if d != self.n_input_dims_:
+            print('Incorrect dimensions for input data.')
+            sys.exit(0)
+            
         X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
         y_ = np.zeros((n, 1))
 

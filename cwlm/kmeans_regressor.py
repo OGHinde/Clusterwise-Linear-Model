@@ -64,18 +64,14 @@ class KMeansRegressor(object):
                 - Add docstring.
                 - Complete multioutput.
         """
-
         self.is_fitted_ = False
         t, n, d, X_tr, y_tr = self._check_data(X_tr, y_tr)
-
-        self.labels_ = self.kmeans_.fit_predict(X_tr)
-
+        labels_tr = self.kmeans_.fit_predict(X_tr)
         reg_weights = np.empty((t, d+1, self.n_components_))
         reg_precisions = np.zeros((t, self.n_components_))
 
         for k in range(self.n_components_):
-
-            idx = (self.labels_ == k)
+            idx = (labels_tr == k)
             self.regs_[k].fit(X_tr[idx, :], y_tr[idx, :])
             reg_weights[:, 0, k] = self.regs_[k].intercept_
             reg_weights[:, 1:, k] = self.regs_[k].coef_
@@ -83,6 +79,9 @@ class KMeansRegressor(object):
             eps = 10 * np.finfo(reg_vars.dtype).eps
             reg_precisions[:, k] = 1/(reg_vars + eps)
 
+        self.n_tasks_ = t
+        self.n_input_dims_ = d
+        self.labels_tr_ = labels_tr
         self.reg_weights_ = reg_weights.squeeze()
         self.reg_precisions_ = reg_precisions.squeeze()
         self.is_fitted = True
@@ -94,28 +93,29 @@ class KMeansRegressor(object):
             return
 
         n, d = X_tst.shape
-        t, _ = self.reg_precisions_.shape
+        if d != self.n_input_dims_:
+            print('Incorrect dimensions for input data.')
+            sys.exit(0)
 
         labels_tst = self.kmeans_.predict(X_tst)
-        targets = np.empty((n, t))
+        targets = np.empty((n, self.n_tasks_))
         for k in range(self.n_components_):
             idx = (labels_tst == k)
+            # Check for empty clusters
             if sum(idx) != 0:
                 targets[idx, :] = self.regs_[k].predict(X_tst[idx, :])
             else:
                 if self.verbose:
                     print("No test samples in cluster %d"%k)
                 pass
-        self.labels_tst = labels_tst
-        self.targets = targets
-        return targets
-    
-    def fit_predict(self, X_tr, y_tr, X_tst):
-        self.fit(X_tr, y_tr)
-        targets = self.predict(X_tst)
+
+        self.labels_tst_ = labels_tst
+        
         return targets
     
     def score(self, X_tst, y_tst):
+        '''TODO: this needs extra metrics.
+        '''
         targets = self.predict(X_tst)
         score = r2_score(y_tst, targets)
         return  score

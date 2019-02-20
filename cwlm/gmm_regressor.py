@@ -171,36 +171,35 @@ class GMMRegressor(object):
         reg_precisions = np.zeros((t, self.n_components))
         for k in range(self.n_components):
             (reg_weights[:, :, k], 
-            reg_precisions[:, k]) = self._estimate_regression_params_k(X, y, 
+            reg_precisions[:, k]) = _estimate_regression_params_k(X, y, 
                 resp_k=resp[:, k], alpha=self.alpha, weights=gmm.weights_)
-            
+        
+        self.n_tasks_ = t
+        self.n_input_dims_ = d
         self.resp_ = resp 
         self.reg_precisions_ = reg_precisions
         self.reg_weights_ = reg_weights
         self.gmm_ = gmm
         self.is_fitted = True
-        return resp
     
     def predict(self, X):
-        if self.is_fitted:
-            n, d = X.shape
-        
-            # Determine test sample/component posterior probability
-            resp_tst = self.gmm_.predict_proba(X)
-        
-            # Predict test targets
-            X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
-            dot_prod = np.dot(X_ext, self.reg_weights_)
-            targets = np.sum(resp_tst * dot_prod, axis=1)
-
-            return targets
-        else:
+        if not self.is_fitted: 
             print("Model isn't fitted.")
             return
-    
-    def fit_predict(self, X_tr, y_tr, X_tst):
-        self.fit(X_tr, y_tr)
-        targets = self.predict(X_tst)
+
+        n, d = X.shape
+        if d != self.n_input_dims_:
+            print('Incorrect dimensions for input data.')
+            sys.exit(0)
+        
+        # Determine test sample/component posterior probability
+        resp_tst = self.gmm_.predict_proba(X)
+        
+        # Predict test targets
+        X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
+        dot_prod = np.dot(X_ext, self.reg_weights_)
+        targets = np.sum(resp_tst * dot_prod, axis=1)
+
         return targets
     
     def score(self, X, y):

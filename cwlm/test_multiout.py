@@ -17,70 +17,120 @@ sys.path.append(home + '/Git/Clusterwise_Linear_Model/')
 from cwlm.clusterwise_linear_model import ClusterwiseLinModel as CWLM
 from cwlm.gmm_regressor import GMMRegressor
 from cwlm.kmeans_regressor import KMeansRegressor
+ 
 
-print('Generating data')
-def compute_targets(X, coefs, intercepts, noise_var=0.5):
+def compute_targets(X, coefs, intercepts, RandomState, noise_var=0.5):
     n, d = X.shape
     t = coefs.shape[0]
-    noise = noise_var*np.random.randn(n, t)
+    noise = noise_var*RandomState.randn(n, t)
     dot_product = np.dot(X, coefs.T)
     return intercepts + dot_product + noise
+
+print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
 
 n_tr = 500  # number of training samples
 n_tst = 100 # number of testsamples
 d = 1       # number of input dimensions
-t = 2       # number of tasks
+t = 1       # number of tasks
 K = 2       # number of clusters
 plot = True
+model = 'KMeansRegressor'
+#model = 'GMMRegressor'
+#model = 'CWLM'
+seed = None
 
-if d > 1:
-    # Don't plot if inputs have more than 1d.
+print('Test parameters:')
+print('\t- Training samples = ', n_tr)
+print('\t- Test samples = ', n_tst)
+print('\t- Input dimensions =', d)
+print('\t- Regression tasks =', t)
+print('\t- Clusters =', K)
+print('\t- Selected model:', model)
+
+if model == 'KMeansRegressor':
+    model = KMeansRegressor(n_components=K)
+elif model == 'GMMRegressor':
+    model = GMMRegressor(n_components=K)
+elif model == 'CWLM':
+    model = CWLM(n_components=K)
+else:
+    print('\nIncorrect model specified')
+    sys.exit(0)
+
+RandomState = (np.random.RandomState(seed) if seed != None 
+               else np.random.RandomState())
+
+if d > 1 & plot == True:
+    print('\nWarning: Too many dimensions to plot. Plotting defaulted to False.')
     plot = False
 
-labels_tr = np.random.randint(0, K, (n_tr, ))
-labels_tst = np.random.randint(0, K, (n_tst, ))
+# DATA GENERATION
+print('\nGenerating data...')
+labels_tr = RandomState.randint(0, K, (n_tr, ))
+labels_tst = RandomState.randint(0, K, (n_tst, ))
 
 X_tr = np.empty((n_tr, d))
 X_tst = np.empty((n_tst, d))
 y_tr = np.empty((n_tr, t))
 y_tst = np.empty((n_tst, t))
 
-displace = np.random.randint(-25, 25, size=(K, d))
+displace = RandomState.randint(-25, 25, size=(K, d))
 for k in range(K):
     idx_tr = labels_tr == k
     idx_tst = labels_tst == k
-    X_tr[idx_tr, :] = 2*np.random.randn(sum(idx_tr), d) + displace[k, :]
-    X_tst[idx_tst, :] = 2*np.random.randn(sum(idx_tst), d) + displace[k, :]
+    X_tr[idx_tr, :] = 2*RandomState.randn(sum(idx_tr), d) + displace[k, :]
+    X_tst[idx_tst, :] = 2*RandomState.randn(sum(idx_tst), d) + displace[k, :]
 
 intercepts = np.empty((t, K))
 coefs = np.empty((t, d, K))
 
-intercepts = np.random.randint(-2, 2, size=(t, K))
-coefs = np.random.randint(-4, 4, size=(t, d, K))
+intercepts = RandomState.randint(-2, 2, size=(t, K))
+coefs = RandomState.randint(-4, 4, size=(t, d, K))
 
 for k in range(K):
     idx_tr = (labels_tr == k)
     idx_tst = (labels_tst == k)
-    y_tr[idx_tr, :] = compute_targets(X_tr[idx_tr, :], 
-        coefs[:, :, k], intercepts[:, k])
+    y_tr[idx_tr, :] = compute_targets(X=X_tr[idx_tr, :], 
+        coefs=coefs[:, :, k], 
+        intercepts=intercepts[:, k], 
+        RandomState=RandomState)
     y_tst[idx_tst, :] = compute_targets(X_tst[idx_tst, :], 
-         coefs[:, :, k], intercepts[:, k])
+        coefs[:, :, k], 
+        intercepts[:, k],  
+        RandomState=RandomState)
 
-model = KMeansRegressor(n_components=K)
-y_ = model.fit(X_tr, y_tr)
-est_weights = model.reg_weights_
+# MODEL EVALUATION
+print('Fitting model...')
+model.fit(X_tr, y_tr)
+y_pred = model.predict(X_tst)
 
-print('Done')
+print('\nDone!')
 
-if plot:
+if plot:    
+    est_weights = model.reg_weights_
+    labels_tst = model.labels_tst_
+    if est_weights.ndim == 2:
+        # Make sure we can iterate even if there's only one task.
+        est_weights = est_weights[np.newaxis, :, :]
+
     for task in range(t):
         figure = plt.figure(task)
         for k in range(K):
             idx = labels_tr == k
             aux_y = compute_targets(X_tr[idx, :], est_weights[:, 1:, k], 
-                                est_weights[:, 0, k], noise_var=0)
+                                est_weights[:, 0, k], noise_var=0, 
+                                RandomState=RandomState)
             plt.scatter(X_tr[idx, :], y_tr[idx, task])
-            plt.plot(X_tr[idx, :], aux_y[:, task], 'r')
+            plt.plot(X_tr[idx, :], aux_y[:, task], c='r')
         plt.title('Fitted model for task %d'%task)
+        plt.show()
+    
+    for task in range(t):
+        figure = plt.figure(task)
+        for k in range(K):
+            idx = labels_tst == k
+            plt.scatter(X_tst[idx, :], y_tst[idx, task])
+            plt.scatter(X_tst[idx, :], y_pred[idx, task], c='r', marker='.')
+        plt.title('Model predictions for task %d'%task)
         plt.show()
 

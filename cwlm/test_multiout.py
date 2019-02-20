@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Created on Thu Feb 14 10:48:25 2019
 
@@ -12,12 +10,13 @@ import matplotlib.pyplot as plt
 
 # Add our module to the path
 import sys
-sys.path.append('/Users/oghinde/Git/Clusterwise_Linear_Model/')
+sys.path.append('/home/ru74c3/Git/Clusterwise_Linear_Model/')
 
 from cwlm.clusterwise_linear_model import ClusterwiseLinModel as CWLM
 from cwlm.gmm_regressor import GMMRegressor
 from cwlm.kmeans_regressor import KMeansRegressor
 
+print('Generating data')
 def compute_targets(X, coefs, intercepts, noise_var=0.5):
     n, d = X.shape
     t = coefs.shape[0]
@@ -69,8 +68,11 @@ model = KMeansRegressor(n_components=K)
 y_ = model.fit(X_tr, y_tr)
 est_weights = model.reg_weights_
 
+print('Done')
+
 if plot:
     for task in range(t):
+        figure = plt.figure(task)
         for k in range(K):
             idx = labels_tr == k
             aux_y = compute_targets(X_tr[idx, :], est_weights[:, 1:, k], 
@@ -79,3 +81,4 @@ if plot:
             plt.plot(X_tr[idx, :], aux_y[:, task], 'r')
         plt.title('Fitted model for task %d'%task)
         plt.show()
+

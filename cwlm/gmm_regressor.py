@@ -10,7 +10,7 @@ from sklearn.mixture import GaussianMixture as GMM
 from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
 
-def _estimate_regression_params_k(X, y, resp_k, alpha):
+def _estimate_regression_params_k(X, y, resp_k, alpha, weights):
     """Estimate the regression weights for the output space for component k.
 
     Parameters
@@ -25,8 +25,11 @@ def _estimate_regression_params_k(X, y, resp_k, alpha):
 
     Returns
     -------
-    reg_weights : array, shape (n_features, )
+    reg_weights : array, shape (n_tasks, n_features + 1)
         The regression weights for component k.
+    
+    reg_precisions_k : array, shape (n_tasks, )
+        The regression precisions for component k.
     """
     n, d = X.shape
     _, t = y.shape
@@ -34,16 +37,16 @@ def _estimate_regression_params_k(X, y, resp_k, alpha):
     X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
     reg_weights_k = np.empty((t, d+1))
     reg_precisions_k = np.empty((t, ))
-
+    
     solver = Ridge(alpha=alpha)
     solver.fit(X, y, sample_weight=resp_k + eps)
     reg_weights_k[:, 0] = solver.intercept_
     reg_weights_k[:, 1:] = solver.coef_
 
-    # TODO: the precisions are tricky
+    # TODO: this needs testing
     means = np.dot(X_ext, reg_weights_k.T)
     err = (y - means) ** 2
-    reg_precisions_k = n * gmm.weights_ / np.sum(resp[:, np.newaxis] * err)
+    reg_precisions_k = n * weights / np.sum(resp_k[:, np.newaxis] * err)
 
     return reg_weights_k, reg_precisions_k
 
@@ -168,8 +171,8 @@ class GMMRegressor(object):
         reg_precisions = np.zeros((t, self.n_components))
         for k in range(self.n_components):
             (reg_weights[:, :, k], 
-            reg_precisions[:, k]) = _estimate_regression_params_k(X, y, 
-                resp_k=resp[:, k], alpha=self.alpha)
+            reg_precisions[:, k]) = self._estimate_regression_params_k(X, y, 
+                resp_k=resp[:, k], alpha=self.alpha, weights=gmm.weights_)
             
         self.resp_ = resp 
         self.reg_precisions_ = reg_precisions

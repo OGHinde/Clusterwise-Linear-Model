@@ -8,9 +8,11 @@ import numpy as np
 from sklearn.linear_model import Ridge
 import matplotlib.pyplot as plt
 
-# Add our module to the path
+# Add our module to PATH
+from pathlib import Path
+home = str(Path.home())
 import sys
-sys.path.append('/home/ru74c3/Git/Clusterwise_Linear_Model/')
+sys.path.append(home + '/Git/Clusterwise_Linear_Model/')
 
 from cwlm.clusterwise_linear_model import ClusterwiseLinModel as CWLM
 from cwlm.gmm_regressor import GMMRegressor

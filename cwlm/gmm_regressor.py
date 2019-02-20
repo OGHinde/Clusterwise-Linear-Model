@@ -40,6 +40,7 @@ def _estimate_regression_weights_k(X, y, resp_k, alpha):
     reg_weights_k[:, 0] = solver.intercept_
     reg_weights_k[:, 1:] = solver.coef_
 
+    # TODO: the precisions are tricky
     means = np.dot(X_ext, reg_weights_k.T)
     err = (y - means) ** 2
     reg_precisions_k = n * gmm.weights_ / np.sum(resp[:, np.newaxis] * err)
@@ -166,13 +167,10 @@ class GMMRegressor(object):
         reg_weights = np.empty((t, d+1, self.n_components))
         reg_precisions = np.zeros((t, self.n_components))
         for k in range(self.n_components):
-            
             (reg_weights[:, :, k], 
             reg_precisions[:, k]) = _estimate_regression_weights_k(X, y, 
                 resp_k=resp[:, k], alpha=self.alpha)
             
-            
-
         self.resp_ = resp 
         self.reg_precisions_ = reg_precisions
         self.reg_weights_ = reg_weights

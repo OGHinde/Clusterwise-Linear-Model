@@ -10,7 +10,7 @@ from sklearn.mixture import GaussianMixture as GMM
 from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
 
-def _estimate_regression_params_k(X, y, resp_k, alpha, weights):
+def _estimate_regression_params_k(X, y, resp_k, alpha, weight_k):
     """Estimate the regression weights for the output space for component k.
 
     Parameters
@@ -46,7 +46,7 @@ def _estimate_regression_params_k(X, y, resp_k, alpha, weights):
     # TODO: this needs testing
     means = np.dot(X_ext, reg_weights_k.T)
     err = (y - means) ** 2
-    reg_precisions_k = n * weights / np.sum(resp_k[:, np.newaxis] * err)
+    reg_precisions_k = n * weight_k / np.sum(resp_k[:, np.newaxis] * err)
 
     return reg_weights_k, reg_precisions_k
 
@@ -154,16 +154,15 @@ class GMMRegressor(object):
         return t, n, d, X, y
 
     def fit(self, X, y):
-
         self.is_fitted_ = False
         t, n, d, X, y = self._check_data(X, y)
         eps = 10 * np.finfo(float).eps
         
-        
         # Determine training sample/component posterior probability
         gmm = GMM(n_components=self.n_components, n_init=self.n_init)
         gmm.fit(X)
-        resp = gmm.predict_proba(X)
+        resp_tr = gmm.predict_proba(X)
+        labels_tr = np.argmax(resp_tr, axis=1)
         
         # Calculate regression weights & precisions conditioned on 
         # posterior probabilities
@@ -172,13 +171,14 @@ class GMMRegressor(object):
         for k in range(self.n_components):
             (reg_weights[:, :, k], 
             reg_precisions[:, k]) = _estimate_regression_params_k(X, y, 
-                resp_k=resp[:, k], alpha=self.alpha, weights=gmm.weights_)
+                resp_k=resp_tr[:, k], alpha=self.alpha, weight_k=gmm.weights_[k])
         
         self.n_tasks_ = t
         self.n_input_dims_ = d
-        self.resp_ = resp 
-        self.reg_precisions_ = reg_precisions
-        self.reg_weights_ = reg_weights
+        self.resp_tr_ = resp_tr
+        self.labels_tr_ = labels_tr
+        self.reg_weights_ = reg_weights.squeeze()
+        self.reg_precisions_ = reg_precisions.squeeze()
         self.gmm_ = gmm
         self.is_fitted = True
     
@@ -192,13 +192,25 @@ class GMMRegressor(object):
             print('Incorrect dimensions for input data.')
             sys.exit(0)
         
-        # Determine test sample/component posterior probability
+        # Make sure we can iterate when n_tasks = 1
+        if self.n_tasks_ == 1:
+            reg_weights = self.reg_weights_[np.newaxis, :, :]
+        else:
+            reg_weights = self.reg_weights_
+
+        # Determine test sample posterior probability
         resp_tst = self.gmm_.predict_proba(X)
-        
+        labels_tst = np.argmax(resp_tst, axis=1)
+
         # Predict test targets
         X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
-        dot_prod = np.dot(X_ext, self.reg_weights_)
-        targets = np.sum(resp_tst * dot_prod, axis=1)
+        targets = np.zeros((n, self.n_tasks_))
+        for k in range(self.n_components):
+            dot_prod = np.dot(X_ext, reg_weights[:, :, k].T)            
+            targets += resp_tst[:, k][:, np.newaxis] * dot_prod
+
+        self.resp_tst_ = resp_tst
+        self.labels_tst_ = labels_tst
 
         return targets
     

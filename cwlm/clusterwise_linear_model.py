@@ -24,6 +24,7 @@ from numpy.random import RandomState
 from scipy import linalg
 from scipy.stats import norm
 from scipy.misc import logsumexp
+from sklearn.utils import check_arrays
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.linear_model import Ridge
 from cwlm.kmeans_regressor import KMeansRegressor
@@ -36,7 +37,14 @@ from sklearn.exceptions import ConvergenceWarning
 
 import matplotlib.pyplot  as plt
 
+def mean_absolute_percentage_error(y_true, y_pred): 
+    y_true, y_pred = check_arrays(y_true, y_pred)
 
+    ## Note: does not handle mix 1d representation
+    #if _is_1d(y_true): 
+    #    y_true, y_pred = _check_1d_array(y_true, y_pred)
+
+    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
 ###############################################################################
 # USED IN THE E STEP 
 
@@ -731,11 +739,11 @@ class ClusterwiseLinModel():
 
         return targets
 
-    def predict_score(self, X, y, metric='R2', labels=False):
+    def predict_score(self, X, y, metric='R2'):
         """Estimate and score the values of the outputs for a new set of inputs
 
         Compute the expected value of y given the trained model and a set X of 
-        new observations. Calculate the mean square error between the predicted 
+        new observations. Calculate the specified error metric for the predicted 
         values against the real values.
 
         Parameters
@@ -748,27 +756,26 @@ class ClusterwiseLinModel():
         y : array, shape (n_samples, 1)
         score : int
         """
-        if labels:
-            labels_, y_ = self.predict(X, labels=labels)
-        else:
-            y_ = self.predict(X, labels=labels)
+        y_est = self.predict(X)
         
         if metric == 'MSE':
-            score = mean_squared_error(y, y_)
+            score = mean_squared_error(y, y_est)
         elif metric == 'R2': 
-            score = r2_score(y, y_)
+            score = r2_score(y, y_est)
         elif metric == 'MAE':
-            score = mean_absolute_error(y, y_)    
+            score = mean_absolute_error(y, y_est)    
+        elif metric == 'MAPE':
+            score = mean_absolute_percentage_error(y, y_est)
         elif metric == 'all': 
-            score = [r2_score(y, y_), mean_squared_error(y, y_), mean_absolute_error(y, y_)]
+            score = [r2_score(y, y_est), 
+                     mean_squared_error(y, y_est), 
+                     mean_absolute_error(y, y_est), 
+                     mean_absolute_percentage_error(y, y_est)]
         else:
             print("Wrong score metric specified. Must be either 'MSE', 'MAE', 'R2' or 'all'.")
             return
 
-        if labels:
-            return labels_, y_, score
-        else:
-            return y_, score
+        return y_est, score
 
     def _compute_lower_bound(self, log_prob_norm):
         """We'll do it like this for now.

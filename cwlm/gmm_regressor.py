@@ -38,12 +38,13 @@ def _estimate_regression_params_k(X, y, resp_k, alpha, weight_k):
     reg_weights_k = np.empty((t, d+1))
     reg_precisions_k = np.empty((t, ))
     
+    # Compute regression weights using Ridge
     solver = Ridge(alpha=alpha)
     solver.fit(X, y, sample_weight=resp_k + eps)
     reg_weights_k[:, 0] = solver.intercept_
     reg_weights_k[:, 1:] = solver.coef_
 
-    # TODO: this needs testing
+    # Compute regression precisions
     means = np.dot(X_ext, reg_weights_k.T)
     err = (y - means) ** 2
     reg_precisions_k = n * weight_k / np.sum(resp_k[:, np.newaxis] * err)
@@ -180,10 +181,10 @@ class GMMRegressor(object):
         self.reg_weights_ = reg_weights.squeeze()
         self.reg_precisions_ = reg_precisions.squeeze()
         self.gmm_ = gmm
-        self.is_fitted = True
+        self.is_fitted_ = True
     
     def predict(self, X):
-        if not self.is_fitted: 
+        if not self.is_fitted_: 
             print("Model isn't fitted.")
             return
 

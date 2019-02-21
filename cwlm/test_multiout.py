@@ -31,12 +31,12 @@ print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
 n_tr = 500  # number of training samples
 n_tst = 100 # number of testsamples
 d = 1       # number of input dimensions
-t = 2       # number of tasks
+t = 1       # number of tasks
 K = 2       # number of clusters
 plot = True
-model = 'KMeansRegressor'
+#model = 'KMeansRegressor'
 #model = 'GMMRegressor'
-#model = 'CWLM'
+model = 'CWLM'
 seed = None
 
 print('Test parameters:')
@@ -52,7 +52,7 @@ if model == 'KMeansRegressor':
 elif model == 'GMMRegressor':
     model = GMMRegressor(n_components=K)
 elif model == 'CWLM':
-    model = CWLM(n_components=K)
+    model = CWLM(n_components=K, init_params='kmeans')
 else:
     print('\nIncorrect model specified')
     sys.exit(0)
@@ -102,7 +102,7 @@ for k in range(K):
 # MODEL EVALUATION
 print('Fitting model...')
 model.fit(X_tr, y_tr)
-y_pred = model.predict(X_tst)
+y_pred = model.predict(X_tst)[:, np.newaxis]
 
 print('\nDone!')
 
@@ -116,7 +116,7 @@ if plot:
     for task in range(t):
         figure = plt.figure(task)
         for k in range(K):
-            idx = labels_tr == k
+            idx = model.labels_tr_ == k
             aux_y = compute_targets(X_tr[idx, :], est_weights[:, 1:, k], 
                                 est_weights[:, 0, k], noise_var=0, 
                                 RandomState=RandomState)

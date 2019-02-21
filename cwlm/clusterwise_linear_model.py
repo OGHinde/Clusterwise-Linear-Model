@@ -4,8 +4,8 @@
     Python Version: 3.6
 
 TODO:
+    - Multioutput: e-step, predict.
     - Include MAPE performance metric.
-    - Multioutput.
     - Implement parallelization with MPI.
     - Implement other input covariances.
     - Revisit RandomState
@@ -38,7 +38,7 @@ import matplotlib.pyplot  as plt
 
 
 ###############################################################################
-# USED IN THE E STEP 
+# USED IN THE E STEP 
 
 def _estimate_log_prob_X(X, means, precisions_cholesky):
     """Estimate the log Gaussian probability of the input space,
@@ -120,7 +120,7 @@ def _estimate_log_prob_y(X, y, reg_weights, reg_precisions):
 
 
 ###############################################################################
-# USED IN THE M STEP 
+# USED IN THE M STEP 
 
 def _estimate_gaussian_parameters(X, resp, reg_covar):
     """Estimate the Gaussian distribution parameters for the input space.
@@ -216,8 +216,8 @@ def _compute_precision_cholesky(covariances):
     
     return precisions_chol
 
-def _estimate_regression_weights(X, y, resp_k, reg_term_k):
-    """Estimate the regression weights for the output space for component k.
+def _estimate_regression_params_k(X, y, resp_k, reg_term_k, weight_k):
+    """Estimate the regression parameters for the output space for component k.
 
     Parameters
     ----------
@@ -234,16 +234,26 @@ def _estimate_regression_weights(X, y, resp_k, reg_term_k):
     reg_weights : array, shape (n_features, )
         The regression weights for component k.
     """
-    _, d = X.shape
+    n, d = X.shape
+    _, t = y.shape
+    X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
     eps = 10 * np.finfo(resp_k.dtype).eps
-    reg_weights_k = np.zeros((d+1,))
+
+    reg_weights_k = np.empty((t, d+1))
+    reg_precisions_k = np.empty((t, ))
     
+    # Compute the output space regression weights using Ridge
     solver = Ridge(alpha=reg_term_k)
     solver.fit(X, y, sample_weight=resp_k + eps)
-    reg_weights_k[0] = solver.intercept_
-    reg_weights_k[1:] = solver.coef_
+    reg_weights_k[:, 0] = solver.intercept_
+    reg_weights_k[:, 1:] = solver.coef_
 
-    return reg_weights_k
+    # Compute the output space precision terms
+    means = np.dot(X_ext, reg_weights_k.T)
+    err = (y - means) ** 2
+    reg_precisions_k = n * weight_k / np.sum(resp_k[:, np.newaxis] * err)
+
+    return reg_weights_k, reg_precisions_k
 
 
 ###############################################################################
@@ -366,7 +376,7 @@ class ClusterwiseLinModel():
         self.random_seed = random_seed
         self.plot = plot
 
-    def _check_data(X, y):
+    def _check_data(self, X, y):
         """Check that the input data is correctly formatted.
 
         Parameters
@@ -422,7 +432,7 @@ class ClusterwiseLinModel():
             initializer = KMeansRegressor(n_components=self.n_components, alpha=self.eta)
             initializer.fit(X, y)
             resp = np.zeros((n, self.n_components))
-            resp[np.arange(n), initializer.labels_] = 1
+            resp[np.arange(n), initializer.labels_tr_] = 1
             reg_weights = initializer.reg_weights_
             reg_precisions = initializer.reg_precisions_
 
@@ -430,12 +440,13 @@ class ClusterwiseLinModel():
             initializer = GMMRegressor(n_components=self.n_components, alpha=self.eta, 
                 n_init=1, covariance_type='full')
             initializer.fit(X, y)
-            resp = initializer.resp_
+            resp = initializer.resp_tr_
             reg_weights = initializer.reg_weights_
             reg_precisions = initializer.reg_precisions_
         
         elif self.init_params == 'random':
-            # This tends to work like crap
+            # This tends to work like crap.
+            # Leaving it out of multioutput implementation for now.
             resp = RandomState.rand(n, self.n_components)
             resp /= resp.sum(axis=1)[:, np.newaxis]
             reg_weights = RandomState.randn(d + 1, self.n_components)
@@ -484,12 +495,15 @@ class ClusterwiseLinModel():
         n, d = X.shape
         max_lower_bound = -np.infty
         self.converged_ = False
-        
-        t, n, d, X, y = self._check_data(X, y)
+        self.is_fitted_ = False
         
         # Summon the Random Number Gods
         rng = RandomState(self.random_seed)
-
+        
+        t, n, d, X, y = self._check_data(X, y)
+        self.n_tasks_ = t
+        self.n_input_dims_ = d
+        
         for init in range(self.n_init):            
             lower_bound = -np.infty
             self._initialise(X, y, rng)
@@ -508,7 +522,7 @@ class ClusterwiseLinModel():
 
                 # E-Step and M-Step
                 log_prob_norm, log_resp, _, _, _ = self._e_step(X, y)
-                self._m_step(X, y, log_resp)
+                self._m_step(X, y, np.exp(log_resp))
 
                 # Update lower bound
                 lower_bound = self._compute_lower_bound(log_prob_norm)
@@ -557,8 +571,7 @@ class ClusterwiseLinModel():
         # Always do a final e-step to guarantee that the labels returned by
         # fit_pred(X, y) are always consistent with fit(X, y).predict(X)
         # for any value of max_iter and tol (and any random_state).
-        _, log_resp, self.labels_, self.labels_X_, self.labels_y_ = self._e_step(X, y)
-        self.resp_ = np.exp(log_resp)
+        _, log_resp, self.labels_tr_, self.labels_X_, self.labels_y_ = self._e_step(X, y)
 
         if not self.converged_:
             warnings.warn('Initialization %d did not converge. '
@@ -568,15 +581,26 @@ class ClusterwiseLinModel():
                           % (init + 1), ConvergenceWarning)
             #print('Model did not converge after %d initializations.'%(self.n_init))
 
-        self.n_tasks_ = t
-        self.n_input_dims_ = d
         self._set_parameters(best_params)
         self.n_iter_ = best_n_iter
         self.lower_bound_ = max_lower_bound
+        self.resp_tr_ = np.exp(log_resp)
         self.low_bound_curves_ = best_curves
+        self.is_fitted_ = True
 
     def _e_step(self, X, y):
         """E step.
+
+        MULTIOUTPUT: responisibilities change drastically as they now have a new dimension (n_tasks)
+        Cluster weights and log_prob_X are unaffected, but log_prob_y changes significantly since we 
+        will have one probability per task and per component. The resulting matrices will have the
+        following shapes:
+
+        log_weights : (n_components)
+        log_prob_X : (n_samples, n_components)
+        log_prob_y : (n_samples, n_tasks, n_components)
+        log_resp : (n_samples, n_tasks, n_components)
+
 
         Parameters
         ----------
@@ -615,7 +639,7 @@ class ClusterwiseLinModel():
 
         return log_prob_norm, log_resp, labels, labels_X, labels_y
 
-    def _m_step(self, X, y, log_resp):
+    def _m_step(self, X, y, resp):
         """M step.
 
         Parameters
@@ -628,13 +652,13 @@ class ClusterwiseLinModel():
             the point of each sample in X.
         """
         n, d = X.shape
-        _, K = log_resp.shape
-        resp = np.exp(log_resp)
         eps = 10 * np.finfo(resp.dtype).eps
-        X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
 
         # Regularization term (equivalent to Gaussian prior on the regression weights)
         reg_term = self.eta / (self.reg_precisions_ + eps)
+        # Make sure we can iterate when n_tasks = 1
+        if self.n_tasks_ == 1:
+            reg_term = reg_term[np.newaxis, :]
         
         # Update the mixture weights
         weights = resp.sum(axis=0) + eps
@@ -647,19 +671,17 @@ class ClusterwiseLinModel():
         self.precisions_cholesky_ = _compute_precision_cholesky(self.covariances_)
 
         # Update the output space regression weights
-        reg_weights = np.zeros_like(self.reg_weights_)
-        for k in range(K):
-            reg_weights[:, k] = _estimate_regression_weights(X, 
-                y, resp_k=resp[:, k], reg_term_k=reg_term[k])
-        self.reg_weights_ = reg_weights
+        reg_weights = np.empty((self.n_tasks_, self.n_input_dims_+1, self.n_components))
+        reg_precisions = np.zeros((self.n_tasks_, self.n_components))
+        for k in range(self.n_components):
+            (reg_weights[:, :, k], 
+             reg_precisions[:, k]) = _estimate_regression_params_k(X, y, resp_k=resp[:, k], 
+                                     reg_term_k=reg_term[:, k], weight_k=weights[k])
         
-        # Update the output space precision terms
-        means = np.dot(X_ext, self.reg_weights_)
-        err = (np.tile(y, (1, K)) - means) ** 2
-        reg_precisions = n * self.weights_ / np.sum(resp * err)
-        self.reg_precisions_ = reg_precisions
+        self.reg_weights_ = reg_weights.squeeze()
+        self.reg_precisions_ = reg_precisions.squeeze()
 
-    def predict(self, X, labels=False):
+    def predict(self, X):
         """Estimate the values of the outputs for a new set of inputs.
 
         Compute the expected value of y given the trained model and a set
@@ -671,19 +693,21 @@ class ClusterwiseLinModel():
 
         Returns
         -------
-        y_ : array, shape (n_samples, 1)
+        targets : array, shape (n_samples, 1)
         """
-        if not self.is_fitted: 
+        if not self.is_fitted_: 
             print("Model isn't fitted.")
             return
 
+        
+        eps = 10 * np.finfo(self.resp_tr_.dtype).eps
         n, d = X.shape
         if d != self.n_input_dims_:
             print('Incorrect dimensions for input data.')
             sys.exit(0)
             
         X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
-        y_ = np.zeros((n, 1))
+        targets = np.zeros((n, 1))
 
         # Compute all the log-factors for the responsibility expression
         log_weights = np.log(self.weights_)
@@ -695,18 +719,17 @@ class ClusterwiseLinModel():
         with np.errstate(under='ignore'):
             # ignore underflow
             log_resp = weighted_log_prob - log_prob_norm[:, np.newaxis]
-        resp = np.exp(log_resp)
-        labels_ = log_resp.argmax(axis=1)
+        resp_tst = np.exp(log_resp)
+        labels_tst = log_resp.argmax(axis=1)
         
         # Compute the expected value of the predictive posterior.
-        eps = 10 * np.finfo(resp.dtype).eps
         dot_prod = np.dot(X_ext, self.reg_weights_)
-        y_ = np.sum((resp + eps) * dot_prod, axis=1)
+        targets = np.sum((resp_tst + eps) * dot_prod, axis=1)
 
-        if labels:
-            return labels_, y_
-        else:
-            return y_
+        self.resp_tst_ = resp_tst
+        self.labels_tst_ = labels_tst
+
+        return targets
 
     def predict_score(self, X, y, metric='R2', labels=False):
         """Estimate and score the values of the outputs for a new set of inputs

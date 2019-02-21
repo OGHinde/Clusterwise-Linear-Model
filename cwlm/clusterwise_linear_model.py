@@ -45,6 +45,7 @@ def mean_absolute_percentage_error(y_true, y_pred):
     #    y_true, y_pred = _check_1d_array(y_true, y_pred)
 
     return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
 ###############################################################################
 # USED IN THE E STEP 
 

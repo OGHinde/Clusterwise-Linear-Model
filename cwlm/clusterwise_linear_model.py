@@ -24,7 +24,7 @@ from numpy.random import RandomState
 from scipy import linalg
 from scipy.stats import norm
 from scipy.misc import logsumexp
-from sklearn.utils import check_arrays
+from sklearn.utils import check_array
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.linear_model import Ridge
 from cwlm.kmeans_regressor import KMeansRegressor
@@ -37,12 +37,23 @@ from sklearn.exceptions import ConvergenceWarning
 
 import matplotlib.pyplot  as plt
 
-def mean_absolute_percentage_error(y_true, y_pred): 
-    y_true, y_pred = check_arrays(y_true, y_pred)
+def mean_absolute_percentage_error(y_true, y_pred):
+    """Mean absolute precentage error regression loss.
+    TODO: multi target.
+    ----------
+    y_true : array-like of shape = (n_samples) or (n_samples, n_targets)
+        Ground truth (correct) target values.
+    y_pred : array-like of shape = (n_samples) or (n_samples, n_targets)
+        Estimated target values.
 
-    ## Note: does not handle mix 1d representation
-    #if _is_1d(y_true): 
-    #    y_true, y_pred = _check_1d_array(y_true, y_pred)
+    Returns
+    -------
+    loss : float or ndarray of floats
+        A non-negative floating point value (the best value is 0.0), or an
+        array of floating point values, one for each individual target.
+    """
+    y_true = check_array(y_true)
+    y_pred = check_array(y_pred)
 
     return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
 

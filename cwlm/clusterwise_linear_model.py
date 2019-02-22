@@ -264,7 +264,8 @@ def _estimate_regression_params_k(X, y, resp_k, reg_term_k, weight_k):
     reg_precisions_k = np.empty((n_targets, ))
     
     # Compute the output space regression weights using Ridge
-    # We'll iterate over all targets for now
+    # We'll iterate over all targets for now. Not sure if this can be
+    # done without the loop if n_targets > 1.
     for t in range(n_targets):
         solver = Ridge(alpha=reg_term_k[t])
         solver.fit(X, y[:, t], sample_weight=resp_k[:, t] + eps)

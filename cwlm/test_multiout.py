@@ -17,7 +17,7 @@ sys.path.append(home + '/Git/Clusterwise_Linear_Model/')
 from cwlm.clusterwise_linear_model import ClusterwiseLinModel as CWLM
 from cwlm.gmm_regressor import GMMRegressor
 from cwlm.kmeans_regressor import KMeansRegressor
- 
+
 
 def compute_targets(X, coefs, intercepts, RandomState, noise_var=0.5):
     n, d = X.shape
@@ -32,7 +32,7 @@ n_tr = 500  # number of training samples
 n_tst = 100 # number of testsamples
 d = 1       # number of input dimensions
 t = 1       # number of tasks
-K = 2       # number of clusters
+K = 2      # number of clusters
 plot = True
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
@@ -109,6 +109,8 @@ print('\nDone!')
 if plot:    
     est_weights = model.reg_weights_
     labels_tst = model.labels_tst_
+    labels_tr = model.labels_tr_
+    
     if est_weights.ndim == 2:
         # Make sure we can iterate even if there's only one task.
         est_weights = est_weights[np.newaxis, :, :]

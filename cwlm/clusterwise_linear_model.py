@@ -588,7 +588,7 @@ class ClusterwiseLinModel():
         # Always do a final e-step to guarantee that the labels returned by
         # fit_pred(X, y) are always consistent with fit(X, y).predict(X)
         # for any value of max_iter and tol (and any random_state).
-        _, log_resp, self.labels_tr_, self.labels_X_, self.labels_y_ = self._e_step(X, y)
+        _, log_resp, labels_tr, labels_X, labels_y = self._e_step(X, y)
 
         if not self.converged_:
             warnings.warn('Initialization %d did not converge. '
@@ -600,7 +600,10 @@ class ClusterwiseLinModel():
         self._set_parameters(best_params)
         self.n_iter_ = best_n_iter
         self.lower_bound_ = max_lower_bound
-        self.resp_tr_ = np.exp(log_resp)
+        self.resp_tr_ = np.exp(log_resp).squeeze()
+        self.labels_tr_ =labels_tr.squeeze()  
+        self.labels_X_ = labels_X
+        self.labels_y_ = labels_y.squeeze()
         self.low_bound_curves_ = best_curves
         self.is_fitted_ = True
 
@@ -706,13 +709,11 @@ class ClusterwiseLinModel():
         reg_weights = np.empty((self.n_targets_, self.n_input_dims_+1, self.n_components))
         reg_precisions = np.zeros((self.n_targets_, self.n_components))
         for k in range(self.n_components):
-            (reg_weights_k, 
-             reg_precisions_k) = _estimate_regression_params_k(X, y, 
-                                                                resp[:, :, k],
-                                                                reg_term[:, k], 
-                                                                weights[k])
-            reg_weights[:, :, k] = reg_weights_k 
-            reg_precisions[:, k] = reg_precisions_k
+            (reg_weights[:, :, k], 
+             reg_precisions[:, k]) = _estimate_regression_params_k(X, y,
+                                                                   resp[:, :, k],
+                                                                   reg_term[:, k],
+                                                                   weights[k])
         
         self.reg_weights_ = reg_weights.squeeze()
         self.reg_precisions_ = reg_precisions.squeeze()

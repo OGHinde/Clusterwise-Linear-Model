@@ -31,7 +31,7 @@ print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
 n_tr = 500  # number of training samples
 n_tst = 100 # number of testsamples
 d = 1       # number of input dimensions
-t = 1       # number of tasks
+t = 2       # number of tasks
 K = 2      # number of clusters
 plot = True
 #model = 'KMeansRegressor'
@@ -102,33 +102,31 @@ for k in range(K):
 # MODEL EVALUATION
 print('Fitting model...')
 model.fit(X_tr, y_tr)
-y_pred = model.predict(X_tst)[:, np.newaxis]
+y_pred = model.predict(X_tst)
 
 print('\nDone!')
-
 if plot:    
     est_weights = model.reg_weights_
     labels_tst = model.labels_tst_
     labels_tr = model.labels_tr_
-    
+    X_tr_ext = np.concatenate((np.ones((n_tr, 1)), X_tr), axis=1)
     if est_weights.ndim == 2:
         # Make sure we can iterate even if there's only one task.
         est_weights = est_weights[np.newaxis, :, :]
+        labels_tr = labels_tr[:, np.newaxis]
+        labels_tst = labels_tst[:, np.newaxis]        
 
     for task in range(t):
-        figure = plt.figure(task)
         for k in range(K):
-            idx = model.labels_tr_ == k
-            aux_y = compute_targets(X_tr[idx, :], est_weights[:, 1:, k], 
-                                est_weights[:, 0, k], noise_var=0, 
-                                RandomState=RandomState)
+            idx = labels_tr[:, task] == k
+            aux_y = np.dot(X_tr_ext[idx, :], est_weights[task, :, k])
+            aux_y = aux_y
             plt.scatter(X_tr[idx, :], y_tr[idx, task])
-            plt.plot(X_tr[idx, :], aux_y[:, task], c='r')
+            plt.plot(X_tr[idx, :], aux_y, c='r')
         plt.title('Fitted model for task %d'%task)
         plt.show()
-    
+        
     for task in range(t):
-        figure = plt.figure(task)
         for k in range(K):
             idx = labels_tst == k
             plt.scatter(X_tst[idx, :], y_tst[idx, task])

@@ -4,8 +4,6 @@
     Python Version: 3.6
 
 TODO:
-    - Multitarget: e-step, predict.
-    - Include MAPE performance metric.
     - Implement parallelization with MPI.
     - Implement other input covariances.
     - Revisit RandomState
@@ -471,7 +469,6 @@ class ClusterwiseLinModel():
             resp /= resp.sum(axis=1)[:, np.newaxis]
             reg_weights = RandomState.randn(d + 1, self.n_components)
             reg_precisions = np.zeros((self.n_components, )) + 1 / np.var(y)
-
         else:
             raise ValueError("Unimplemented initialization method '%s'"
                              % self.init_params)
@@ -629,10 +626,10 @@ class ClusterwiseLinModel():
 
         Returns
         -------
-        log_prob_norm : float
+        log_prob_norm : array, shape (n_samples, n_targets) 
             Mean of the logarithms of the probabilities of each input-output 
             pair in X & y.
-        log_responsibility : array, shape (n_samples, n_tasks, n_components)
+        log_responsibility : array, shape (n_samples, n_targets, n_components)
             Logarithm of the posterior probabilities (or responsibilities) of
             the point of each input-output pair in X & y.
         """

@@ -4,9 +4,9 @@
     Python Version: 3.6
 
 TODO:
-    - Multioutput.
     - Implement parallelization with MPI.
     - Implement other input covariances.
+    - Revisit RandomState
     - Update Attributes docstring.
 
 ISSUES:
@@ -17,11 +17,13 @@ NEXT STEPS:
     - Pruning of weak clusters.
 """
 
+import sys
 import numpy as np
 from numpy.random import RandomState
 from scipy import linalg
 from scipy.stats import norm
 from scipy.misc import logsumexp
+from sklearn.utils import check_array
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.linear_model import Ridge
 from cwlm.kmeans_regressor import KMeansRegressor
@@ -34,9 +36,28 @@ from sklearn.exceptions import ConvergenceWarning
 
 import matplotlib.pyplot  as plt
 
+def mean_absolute_percentage_error(y_true, y_pred, multitarget=None):
+    """Mean absolute precentage error regression loss.
+    TODO: multi target.
+    ----------
+    y_true : array-like of shape = (n_samples) or (n_samples, n_targets)
+        Ground truth (correct) target values.
+    y_pred : array-like of shape = (n_samples) or (n_samples, n_targets)
+        Estimated target values.
+
+    Returns
+    -------
+    loss : float or ndarray of floats
+        A non-negative floating point value (the best value is 0.0), or an
+        array of floating point values, one for each individual target.
+    """
+    y_true = check_array(y_true)
+    y_pred = check_array(y_pred)
+
+    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
 
 ###############################################################################
-# USED IN THE E STEP 
+# USED IN THE E STEP 
 
 def _estimate_log_prob_X(X, means, precisions_cholesky):
     """Estimate the log Gaussian probability of the input space,
@@ -90,35 +111,36 @@ def _compute_log_det_cholesky(matrix_chol, n_features):
 
     return log_det_chol
 
-def _estimate_log_prob_y(X, y, reg_weights, reg_precisions):
+def _estimate_log_prob_y_k(X, y, reg_weights_k, reg_precisions_k):
     """Estimate the log Gaussian probability of the output space,
-    i.e. the log probability factor for each sample in y.
+    i.e. the log probability factor for each sample in y for 
+    component k.
 
     Parameters
     ----------
-    X : array-like, shape (n_samples, n_features)
-
-    means : array-like, shape (n_components, n_features)
-
-    precisions_chol : array-like
-        Cholesky decompositions of the precision matrices.
+    X : array, shape (n_samples, n_features)
+    y : array, shape (n_samples, n_targets)
+    reg_weights_k : array, shape (n_targets, n_features)
+    reg_precisions_k : array, shape (n_targets, )
 
     Returns
     -------
-    log_prob : array, shape (n_samples, n_components)
+    log_prob : array, shape (n_targets, n_samples, n_components)
     """
     n, d = X.shape
+    _, t = y.shape
+
     # Extend X with a column of ones 
     X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
 
-    means = np.dot(X_ext, reg_weights)
-    std_devs = np.sqrt(reg_precisions ** -1)
+    means = np.dot(X_ext, reg_weights_k.T)
+    std_devs = np.sqrt(reg_precisions_k ** -1)
     
     return norm.logpdf(y, loc=means, scale=std_devs)
 
 
 ###############################################################################
-# USED IN THE M STEP 
+# USED IN THE M STEP 
 
 def _estimate_gaussian_parameters(X, resp, reg_covar):
     """Estimate the Gaussian distribution parameters for the input space.
@@ -214,34 +236,47 @@ def _compute_precision_cholesky(covariances):
     
     return precisions_chol
 
-def _estimate_regression_weights(X, y, resp_k, reg_term_k):
-    """Estimate the regression weights for the output space for component k.
+def _estimate_regression_params_k(X, y, resp_k, reg_term_k, weight_k):
+    """Estimate the regression parameters for the output space for component k.
 
     Parameters
     ----------
-    X : array-like, shape (n_samples, n_features)
+    X : array, shape (n_samples, n_features)
 
-    y : array-like, shape (n_samples, )
+    y : array, shape (n_samples, n_targets)
 
-    resp_k : array-like, shape (n_samples, )
+    resp_k : array, shape (n_samples, n_targets)
 
-    reg_term_k : float
+    reg_term_k : array, shape (n_targets, )
 
     Returns
     -------
-    reg_weights : array, shape (n_features, )
+    reg_weights : array, shape (n_targets, n_features)
         The regression weights for component k.
     """
-    _, d = X.shape
+    n, d = X.shape
+    _, n_targets = y.shape
+    X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
     eps = 10 * np.finfo(resp_k.dtype).eps
-    reg_weights_k = np.zeros((d+1,))
+    reg_weights_k = np.empty((n_targets, d+1))
+    reg_precisions_k = np.empty((n_targets, ))
     
-    solver = Ridge(alpha=reg_term_k)
-    solver.fit(X, y, sample_weight=resp_k + eps)
-    reg_weights_k[0] = solver.intercept_
-    reg_weights_k[1:] = solver.coef_
+    # Compute the output space regression weights using Ridge
+    # We'll iterate over all targets for now. Not sure if this can be
+    # done without the loop if n_targets > 1.
+    for t in range(n_targets):
+        solver = Ridge(alpha=reg_term_k[t])
+        solver.fit(X, y[:, t], sample_weight=resp_k[:, t] + eps)
+        reg_weights_k[t, 0] = solver.intercept_
+        reg_weights_k[t, 1:] = solver.coef_
 
-    return reg_weights_k
+    # Compute the output space precision terms
+    # CHECK THIS
+    means = np.dot(X_ext, reg_weights_k.T)
+    err = (y - means) ** 2
+    reg_precisions_k = n * weight_k / np.sum(np.multiply(resp_k + eps, err), axis=0)
+    
+    return reg_weights_k, reg_precisions_k
 
 
 ###############################################################################
@@ -250,8 +285,9 @@ def _estimate_regression_weights(X, y, resp_k, reg_term_k):
 class ClusterwiseLinModel():
     """Clusterwise Linear Regressor Mixture.
 
-    Representation of a coupled Gaussian and linear regression
-    mixture probability distribution.
+    Representation of a coupled Gaussian and linear regression mixture 
+    probability distribution. It handles multi-target regression, albeit
+    assuming full independence of the targets.
     
     This class estimates the parameters of said mixture distribution using
     the EM algorithm.
@@ -304,11 +340,11 @@ class ClusterwiseLinModel():
         The user-provided initial precisions (inverse of the covariance matrices)
         for the Gaussian Mixture model at input space.
         
-    reg_weights_init : array-like, shape (n_components, n_features + 1), optional
+    reg_weights_init : array-like, shape (n_targets, n_components, n_features + 1), optional
         The user-provided initial means, defaults to None,
         If it None, means are initialized using the `init_params` method.
     
-    reg_precisions_init : array-like, shape (n_components, ), optional.
+    reg_precisions_init : array-like, shape (n_targets, n_components), optional.
         The user-provided initial precisions.
         (The precision is the inverse of the label noise variance).
 
@@ -364,14 +400,45 @@ class ClusterwiseLinModel():
         self.random_seed = random_seed
         self.plot = plot
 
-    def _initialise(self, X, y, RandomState):
-        """Initialization of the Clusterwise Linear Model parameters.
-
-        In this version we'll implement all options: 'kmeans', 'gmm' and 'random'.
+    def _check_data(self, X, y):
+        """Check that the input data is correctly formatted.
 
         Parameters
         ----------
         X : array-like, shape (n_samples, n_features)
+        y : array, shape (n_samples, n_targets)
+
+        Returns
+        -------
+        t : int, the total number of targets.
+        n : int, the total number of samples.
+        d : int, the total number of features (dimensions)
+
+        """
+
+        if y.ndim == 1:
+            y = y[:, np.newaxis]
+
+        n_x, d = X.shape
+        n_y, t = y.shape
+
+        if n_x == n_y:
+            n = n_x
+        else:
+            print('Data size error. Number of samples in X and y must match:')
+            print('X n_samples = {}, y n_samples = {}'.format(n_x, n_y))
+            print('Exiting.')
+            sys.exit()
+
+        return t, n, d, X, y
+
+    def _initialise(self, X, y, RandomState):
+        """Initialization of the Clusterwise Linear Model parameters.    
+
+        Parameters
+        ----------
+        X : array, shape (n_samples, n_features)
+        y : array, shape (n_samples, n_targets)
 
         resp : array-like, shape (n_samples, n_components)
         """
@@ -382,7 +449,7 @@ class ClusterwiseLinModel():
             initializer = KMeansRegressor(n_components=self.n_components, alpha=self.eta)
             initializer.fit(X, y)
             resp = np.zeros((n, self.n_components))
-            resp[np.arange(n), initializer.labels_] = 1
+            resp[np.arange(n), initializer.labels_tr_] = 1
             reg_weights = initializer.reg_weights_
             reg_precisions = initializer.reg_precisions_
 
@@ -390,17 +457,17 @@ class ClusterwiseLinModel():
             initializer = GMMRegressor(n_components=self.n_components, alpha=self.eta, 
                 n_init=1, covariance_type='full')
             initializer.fit(X, y)
-            resp = initializer.resp_
+            resp = initializer.resp_tr_
             reg_weights = initializer.reg_weights_
             reg_precisions = initializer.reg_precisions_
         
         elif self.init_params == 'random':
-            # This tends to work like crap
+            # This tends to work like crap.
+            # TODO: adapt it to multitarget.
             resp = RandomState.rand(n, self.n_components)
             resp /= resp.sum(axis=1)[:, np.newaxis]
             reg_weights = RandomState.randn(d + 1, self.n_components)
             reg_precisions = np.zeros((self.n_components, )) + 1 / np.var(y)
-
         else:
             raise ValueError("Unimplemented initialization method '%s'"
                              % self.init_params)
@@ -426,7 +493,7 @@ class ClusterwiseLinModel():
         data set using the EM algorithm.
 
         It does n_init instances of the algorithm and keeps the one with the
-        highest complete log-likelyhood.
+        highest complete log-likelihood.
         
         Each initialization of the algorithm runs until convergence or max_iter
         times.
@@ -434,8 +501,7 @@ class ClusterwiseLinModel():
         Parameters
         ----------
         X : array-like, shape (n_samples, n_features)
-
-        y : array, shape (n_samples, 1)
+        y : array, shape (n_samples, n_targets)
 
         Returns
         -------
@@ -444,11 +510,15 @@ class ClusterwiseLinModel():
         n, d = X.shape
         max_lower_bound = -np.infty
         self.converged_ = False
-        # Check shape of y and fix if needed
-        if y.shape != (n, 1):
-            y.shape = (n, 1)
+        self.is_fitted_ = False
+        
+        # Summon the Random Number Gods
         rng = RandomState(self.random_seed)
-
+        
+        t, n, d, X, y = self._check_data(X, y)
+        self.n_targets_ = t
+        self.n_input_dims_ = d
+        
         for init in range(self.n_init):            
             lower_bound = -np.infty
             self._initialise(X, y, rng)
@@ -468,18 +538,15 @@ class ClusterwiseLinModel():
                 # E-Step and M-Step
                 log_prob_norm, log_resp, _, _, _ = self._e_step(X, y)
                 self._m_step(X, y, log_resp)
-
-                # Update lower bound
                 lower_bound = self._compute_lower_bound(log_prob_norm)
                 bound_curve.append(lower_bound)
 
                 # Smoothen the bound curve
                 if n_iter <= self.smooth_window:
-                    # compute mean of n_iter previous values
+                    # Compute mean of n_iter previous values
                     smooth_bound = np.mean(bound_curve)
                     smooth_bound_curve.append(smooth_bound)
                 else:
-                    # compute mean of smooth_window previous values
                     smooth_bound = np.mean(bound_curve[-self.smooth_window:])
                     smooth_bound_curve.append(smooth_bound)
 
@@ -488,14 +555,13 @@ class ClusterwiseLinModel():
                     change = smooth_bound - prev_lower_bound
                 else:    
                     change = lower_bound - prev_lower_bound
-                
+
                 if abs(change) < self.tol:
                     self.converged_ = True
                     break
             
             if self.plot:
-                # Plot lower bound evolution curve
-                fig = plt.figure()
+                # Plot lower bound evolution curve                
                 plt.plot(range(1, n_iter+1), bound_curve, label='Standard')
                 plt.plot(range(1, n_iter+1), smooth_bound_curve, label='Smoothed')
                 plt.xlabel('Iteration')
@@ -516,107 +582,126 @@ class ClusterwiseLinModel():
         # Always do a final e-step to guarantee that the labels returned by
         # fit_pred(X, y) are always consistent with fit(X, y).predict(X)
         # for any value of max_iter and tol (and any random_state).
-        _, log_resp, self.labels_, self.labels_X_, self.labels_y_ = self._e_step(X, y)
-        self.resp_ = np.exp(log_resp)
+        _, log_resp, labels_tr, labels_X, labels_y = self._e_step(X, y)
 
         if not self.converged_:
             warnings.warn('Initialization %d did not converge. '
                           'Try different init parameters, '
                           'or increase max_iter, tol '
                           'or check for degenerate data.'
-                          % (init + 1), ConvergenceWarning)
-            #print('Model did not converge after %d initializations.'%(self.n_init))
+                          % (init + 1), ConvergenceWarning)        
 
         self._set_parameters(best_params)
         self.n_iter_ = best_n_iter
         self.lower_bound_ = max_lower_bound
+        self.resp_tr_ = np.exp(log_resp).squeeze()
+        self.labels_tr_ =labels_tr.squeeze()  
+        self.labels_X_ = labels_X
+        self.labels_y_ = labels_y.squeeze()
         self.low_bound_curves_ = best_curves
+        self.is_fitted_ = True
 
     def _e_step(self, X, y):
-        """E step.
+        """Expectation step.
 
         Parameters
         ----------
         X : array-like, shape (n_samples, n_features)
-        y : array-like, shape (n_samples, 1)
+        y : array-like, shape (n_samples, n_targets)
 
         Returns
         -------
-        log_prob_norm : float
+        log_prob_norm : array, shape (n_samples, n_targets) 
             Mean of the logarithms of the probabilities of each input-output 
             pair in X & y.
-
-        log_responsibility : array, shape (n_samples, n_components)
+        log_responsibility : array, shape (n_samples, n_targets, n_components)
             Logarithm of the posterior probabilities (or responsibilities) of
             the point of each input-output pair in X & y.
         """
+        n, _ = X.shape
+        reg_weights = self.reg_weights_
+        reg_precisions = self.reg_precisions_
+        if self.n_targets_ == 1:
+            reg_weights = reg_weights[np.newaxis, :, :]
+            reg_precisions = reg_precisions[np.newaxis, :]
+
         # Compute all the log-factors for the responsibility expression
         log_weights = np.log(self.weights_)
         log_prob_X = _estimate_log_prob_X(X, self.means_, self.precisions_cholesky_)
-        log_prob_y = _estimate_log_prob_y(X, y, self.reg_weights_, self.reg_precisions_)
-
-        # Compute the log-numerator of the responsibility expression
-        weighted_log_prob = log_weights + log_prob_X + log_prob_y
+        log_prob_y = np.empty((n, self.n_targets_, self.n_components))
+        weighted_log_prob = np.empty_like(log_prob_y)
+        for k in range(self.n_components):
+            log_prob_y[:, :, k] = _estimate_log_prob_y_k(X, y, 
+                                                         reg_weights[:, :, k], 
+                                                         reg_precisions[:, k])
+            weighted_log_prob[:, :, k] = (log_weights[k] + 
+                                          log_prob_X[:, k][:, np.newaxis] + 
+                                          log_prob_y[:, :, k])
         
         # Compute the log-denominator of the responsibility expression
-        log_prob_norm = logsumexp(weighted_log_prob, axis=1)
+        log_prob_norm = logsumexp(weighted_log_prob, axis=2)
 
-        with np.errstate(under='ignore'):
-            # Ignore underflow
-            log_resp = weighted_log_prob - log_prob_norm[:, np.newaxis]
-
+        log_resp = np.empty_like(weighted_log_prob)
+        for k in range(self.n_components):
+            with np.errstate(under='ignore'):
+                # Ignore underflow
+                log_resp[:, :, k] = weighted_log_prob[:, :, k] - log_prob_norm
+        
         # Compute labels from all viewpoints
-        labels = log_resp.argmax(axis=1)
         labels_X = log_prob_X.argmax(axis=1)
-        labels_y = log_prob_y.argmax(axis=1)
+        labels_y = log_prob_y.argmax(axis=2)
+        labels = log_resp.argmax(axis=2)
 
         return log_prob_norm, log_resp, labels, labels_X, labels_y
 
     def _m_step(self, X, y, log_resp):
-        """M step.
+        """Maximization step.
 
         Parameters
         ----------
         X : array-like, shape (n_samples, n_features)
-        y : array-like, shape (n_samples, 1)
+        y : array-like, shape (n_samples, n_targets)
+        log_resp : array-like, shape (n_samples, n_targets, n_components)
 
-        log_resp : array-like, shape (n_samples, n_components)
+        log_resp : array-like, shape (n_samples, n_targets, n_components)
             Logarithm of the posterior probabilities (or responsibilities) of
             the point of each sample in X.
         """
         n, d = X.shape
-        _, K = log_resp.shape
         resp = np.exp(log_resp)
+        resp_task = np.exp(log_resp.sum(axis=1))
         eps = 10 * np.finfo(resp.dtype).eps
-        X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
 
         # Regularization term (equivalent to Gaussian prior on the regression weights)
         reg_term = self.eta / (self.reg_precisions_ + eps)
+        # Make sure we can iterate when n_targets = 1
+        if self.n_targets_ == 1:
+            reg_term = reg_term[np.newaxis, :]
         
         # Update the mixture weights
-        weights = resp.sum(axis=0) + eps
+        weights = resp_task.sum(axis=0) + eps
         self.weights_ = weights/n
 
         # Update input space mixture parameters
         (_, 
         self.means_, 
-        self.covariances_) = _estimate_gaussian_parameters(X, resp, self.reg_covar)
+        self.covariances_) = _estimate_gaussian_parameters(X, resp_task, self.reg_covar)        
         self.precisions_cholesky_ = _compute_precision_cholesky(self.covariances_)
 
         # Update the output space regression weights
-        reg_weights = np.zeros_like(self.reg_weights_)
-        for k in range(K):
-            reg_weights[:, k] = _estimate_regression_weights(X, 
-                y, resp_k=resp[:, k], reg_term_k=reg_term[k])
-        self.reg_weights_ = reg_weights
+        reg_weights = np.empty((self.n_targets_, self.n_input_dims_+1, self.n_components))
+        reg_precisions = np.zeros((self.n_targets_, self.n_components))
+        for k in range(self.n_components):
+            (reg_weights[:, :, k], 
+             reg_precisions[:, k]) = _estimate_regression_params_k(X, y,
+                                                                   resp[:, :, k],
+                                                                   reg_term[:, k],
+                                                                   weights[k])
         
-        # Update the output space precision terms
-        means = np.dot(X_ext, self.reg_weights_)
-        err = (np.tile(y, (1, K)) - means) ** 2
-        reg_precisions = n * self.weights_ / np.sum(resp * err)
-        self.reg_precisions_ = reg_precisions
+        self.reg_weights_ = reg_weights.squeeze()
+        self.reg_precisions_ = reg_precisions.squeeze()
 
-    def predict(self, X, labels=False):
+    def predict(self, X):
         """Estimate the values of the outputs for a new set of inputs.
 
         Compute the expected value of y given the trained model and a set
@@ -628,11 +713,26 @@ class ClusterwiseLinModel():
 
         Returns
         -------
-        y_ : array, shape (n_samples, 1)
+        targets : array, shape (n_samples, 1)
         """
+        if not self.is_fitted_: 
+            print("Model isn't fitted.")
+            return
+
+        eps = 10 * np.finfo(self.resp_tr_.dtype).eps
         n, d = X.shape
+        if d != self.n_input_dims_:
+            print('Incorrect dimensions for input data.')
+            sys.exit(0)
+        
+        reg_weights = self.reg_weights_
+        reg_precisions = self.reg_precisions_
+        if self.n_targets_ == 1:
+            reg_weights = reg_weights[np.newaxis, :, :]
+            reg_precisions = reg_precisions[np.newaxis, :]
+
         X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
-        y_ = np.zeros((n, 1))
+        targets = np.zeros((n, self.n_targets_))
 
         # Compute all the log-factors for the responsibility expression
         log_weights = np.log(self.weights_)
@@ -644,24 +744,24 @@ class ClusterwiseLinModel():
         with np.errstate(under='ignore'):
             # ignore underflow
             log_resp = weighted_log_prob - log_prob_norm[:, np.newaxis]
-        resp = np.exp(log_resp)
-        labels_ = log_resp.argmax(axis=1)
-        
+        resp_tst = np.exp(log_resp)
+        labels_tst = log_resp.argmax(axis=1)
+    
         # Compute the expected value of the predictive posterior.
-        eps = 10 * np.finfo(resp.dtype).eps
-        dot_prod = np.dot(X_ext, self.reg_weights_)
-        y_ = np.sum((resp + eps) * dot_prod, axis=1)
+        for k in range(self.n_components):
+            dot_prod = np.dot(X_ext, reg_weights[:, :, k].T)            
+            targets += np.multiply((resp_tst[:, k] + eps)[:, np.newaxis], dot_prod)
 
-        if labels:
-            return labels_, y_
-        else:
-            return y_
+        self.resp_tst_ = resp_tst
+        self.labels_tst_ = labels_tst
 
-    def predict_score(self, X, y, metric='R2', labels=False):
+        return targets
+
+    def predict_score(self, X, y, metric='R2'):
         """Estimate and score the values of the outputs for a new set of inputs
 
         Compute the expected value of y given the trained model and a set X of 
-        new observations. Calculate the mean square error between the predicted 
+        new observations. Calculate the specified error metric for the predicted 
         values against the real values.
 
         Parameters
@@ -674,31 +774,37 @@ class ClusterwiseLinModel():
         y : array, shape (n_samples, 1)
         score : int
         """
-        if labels:
-            labels_, y_ = self.predict(X, labels=labels)
-        else:
-            y_ = self.predict(X, labels=labels)
+        y_est = self.predict(X)
         
         if metric == 'MSE':
-            score = mean_squared_error(y, y_)
+            score = mean_squared_error(y, y_est)
         elif metric == 'R2': 
-            score = r2_score(y, y_)
+            score = r2_score(y, y_est)
         elif metric == 'MAE':
-            score = mean_absolute_error(y, y_)    
+            score = mean_absolute_error(y, y_est)    
+        elif metric == 'MAPE':
+            score = mean_absolute_percentage_error(y, y_est)
         elif metric == 'all': 
-            score = [r2_score(y, y_), mean_squared_error(y, y_), mean_absolute_error(y, y_)]
+            score = [r2_score(y, y_est), 
+                     mean_squared_error(y, y_est), 
+                     mean_absolute_error(y, y_est), 
+                     mean_absolute_percentage_error(y, y_est)]
         else:
             print("Wrong score metric specified. Must be either 'MSE', 'MAE', 'R2' or 'all'.")
             return
 
-        if labels:
-            return labels_, y_, score
-        else:
-            return y_, score
+        return y_est, score
 
     def _compute_lower_bound(self, log_prob_norm):
-        """We'll do it like this for now.
-        It looks right but it's clearly telling us that something's wrong.
+        """Compute the model's complete data log likelihood.
+
+        Parameters
+        ----------
+        log_prob_norm : array, shape (n_samples, n_targets)
+
+        Returns
+        -------
+        lower_bound : float
         """
         return log_prob_norm.sum()
 

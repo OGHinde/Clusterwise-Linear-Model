@@ -14,7 +14,7 @@ home = str(Path.home())
 import sys
 sys.path.append(home + '/Git/Clusterwise_Linear_Model/')
 
-from cwlm.clusterwise_linear_model import ClusterwiseLinModel as CWLM
+from cwlm.mt_cwlm import ClusterwiseLinModel as CWLM
 from cwlm.gmm_regressor import GMMRegressor
 from cwlm.kmeans_regressor import KMeansRegressor
 
@@ -31,8 +31,8 @@ print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
 n_tr = 500  # number of training samples
 n_tst = 100 # number of testsamples
 d = 1       # number of input dimensions
-t = 2       # number of tasks
-K = 3       # number of clusters
+t = 1       # number of tasks
+K = 2       # number of clusters
 plot = True
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
@@ -52,7 +52,7 @@ if model == 'KMeansRegressor':
 elif model == 'GMMRegressor':
     model = GMMRegressor(n_components=K)
 elif model == 'CWLM':
-    model = CWLM(n_components=K, init_params='kmeans')
+    model = CWLM(n_components=K, init_params='kmeans', plot=True)
 else:
     print('\nIncorrect model specified')
     sys.exit(0)
@@ -119,6 +119,7 @@ if plot:
     for task in range(t):
         for k in range(K):
             idx = labels_tr[:, task] == k
+            idx = idx.squeeze()
             aux_y = np.dot(X_tr_ext[idx, :], est_weights[task, :, k])
             aux_y = aux_y
             plt.scatter(X_tr[idx, :], y_tr[idx, task])
@@ -129,6 +130,7 @@ if plot:
     for task in range(t):
         for k in range(K):
             idx = labels_tst == k
+            idx = idx.squeeze()
             plt.scatter(X_tst[idx, :], y_tst[idx, task])
             plt.scatter(X_tst[idx, :], y_pred[idx, task], c='r', marker='.')
         plt.title('Model predictions for task %d'%task)

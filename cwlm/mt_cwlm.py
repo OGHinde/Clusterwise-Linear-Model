@@ -285,8 +285,9 @@ def _estimate_regression_params_k(X, y, resp_k, reg_term_k, weight_k):
 class ClusterwiseLinModel():
     """Clusterwise Linear Regressor Mixture.
 
-    Representation of a coupled Gaussian and linear regression
-    mixture probability distribution.
+    Representation of a coupled Gaussian and linear regression mixture 
+    probability distribution. It handles multi-target regression, albeit
+    assuming full independence of the targets.
     
     This class estimates the parameters of said mixture distribution using
     the EM algorithm.
@@ -432,9 +433,7 @@ class ClusterwiseLinModel():
         return t, n, d, X, y
 
     def _initialise(self, X, y, RandomState):
-        """Initialization of the Clusterwise Linear Model parameters.
-
-        In this version we'll implement all options: 'kmeans', 'gmm' and 'random'.
+        """Initialization of the Clusterwise Linear Model parameters.    
 
         Parameters
         ----------
@@ -464,7 +463,7 @@ class ClusterwiseLinModel():
         
         elif self.init_params == 'random':
             # This tends to work like crap.
-            # Leaving it out of multioutput implementation for now.
+            # TODO: adapt it to multitarget.
             resp = RandomState.rand(n, self.n_components)
             resp /= resp.sum(axis=1)[:, np.newaxis]
             reg_weights = RandomState.randn(d + 1, self.n_components)
@@ -494,7 +493,7 @@ class ClusterwiseLinModel():
         data set using the EM algorithm.
 
         It does n_init instances of the algorithm and keeps the one with the
-        highest complete log-likelyhood.
+        highest complete log-likelihood.
         
         Each initialization of the algorithm runs until convergence or max_iter
         times.
@@ -539,8 +538,6 @@ class ClusterwiseLinModel():
                 # E-Step and M-Step
                 log_prob_norm, log_resp, _, _, _ = self._e_step(X, y)
                 self._m_step(X, y, log_resp)
-
-                # Update lower bound
                 lower_bound = self._compute_lower_bound(log_prob_norm)
                 bound_curve.append(lower_bound)
 
@@ -550,7 +547,6 @@ class ClusterwiseLinModel():
                     smooth_bound = np.mean(bound_curve)
                     smooth_bound_curve.append(smooth_bound)
                 else:
-                    # Compute mean of smooth_window previous values
                     smooth_bound = np.mean(bound_curve[-self.smooth_window:])
                     smooth_bound_curve.append(smooth_bound)
 
@@ -606,18 +602,7 @@ class ClusterwiseLinModel():
         self.is_fitted_ = True
 
     def _e_step(self, X, y):
-        """E step.
-
-        MULTIOUTPUT: responisibilities change drastically as they now have a new dimension (n_targets)
-        Cluster weights and log_prob_X are unaffected, but log_prob_y changes significantly since we 
-        will have one probability per task and per component. The resulting matrices will have the
-        following shapes:
-
-        log_weights : (n_components)
-        log_prob_X : (n_samples, n_components)
-        log_prob_y : (n_samples, n_targets, n_components)
-        log_resp : (n_samples, n_targets, n_components)
-
+        """Expectation step.
 
         Parameters
         ----------
@@ -670,7 +655,7 @@ class ClusterwiseLinModel():
         return log_prob_norm, log_resp, labels, labels_X, labels_y
 
     def _m_step(self, X, y, log_resp):
-        """M step.
+        """Maximization step.
 
         Parameters
         ----------
@@ -811,8 +796,15 @@ class ClusterwiseLinModel():
         return y_est, score
 
     def _compute_lower_bound(self, log_prob_norm):
-        """We'll do it like this for now.
-        It looks right but it's clearly telling us that something's wrong.
+        """Compute the model's complete data log likelihood.
+
+        Parameters
+        ----------
+        log_prob_norm : array, shape (n_samples, n_targets)
+
+        Returns
+        -------
+        lower_bound : float
         """
         return log_prob_norm.sum()
 

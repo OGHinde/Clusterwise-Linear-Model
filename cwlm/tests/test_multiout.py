@@ -39,7 +39,7 @@ plot = True
 #model = 'GMMRegressor'
 #model = 'CWLM'
 model = 'MT_CWLM'
-seed = 1
+seed = None
 
 print('Test parameters:')
 print('\t- Training samples = ', n_tr)
@@ -61,7 +61,7 @@ elif model == 'CWLM':
                  n_init=10)
 elif model == 'MT_CWLM':
     model = MT_CWLM(n_components=K, 
-                    init_params='kmeans', 
+                    init_params='gmm', 
                     plot=plot, 
                     tol=1e-10, 
                     n_init=10)

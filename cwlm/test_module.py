@@ -13,9 +13,12 @@ Check these githubs:
     
 This should go in a notebook.
 """
-# Add our module to the path
+
+# Add our module to PATH
+from pathlib import Path
+home = str(Path.home())
 import sys
-sys.path.append('/Users/oghinde/Dropbox/Work/Clusterwise_LM/model/')
+sys.path.append(home + '/Git/Clusterwise_Linear_Model/')
 
 import numpy as np
 from cwlm.clusterwise_linear_model import ClusterwiseLinModel as CWLM

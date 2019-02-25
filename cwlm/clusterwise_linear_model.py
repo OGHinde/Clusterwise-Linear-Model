@@ -113,7 +113,7 @@ def _estimate_log_prob_y(X, y, reg_weights, reg_precisions):
 
     means = np.dot(X_ext, reg_weights)
     std_devs = np.sqrt(reg_precisions ** -1)
-    
+
     return norm.logpdf(y, loc=means, scale=std_devs)
 
 
@@ -382,7 +382,7 @@ class ClusterwiseLinModel():
             initializer = KMeansRegressor(n_components=self.n_components, alpha=self.eta)
             initializer.fit(X, y)
             resp = np.zeros((n, self.n_components))
-            resp[np.arange(n), initializer.labels_] = 1
+            resp[np.arange(n), initializer.labels_tr_] = 1
             reg_weights = initializer.reg_weights_
             reg_precisions = initializer.reg_precisions_
 
@@ -390,7 +390,7 @@ class ClusterwiseLinModel():
             initializer = GMMRegressor(n_components=self.n_components, alpha=self.eta, 
                 n_init=1, covariance_type='full')
             initializer.fit(X, y)
-            resp = initializer.resp_
+            resp = initializer.resp_tr_
             reg_weights = initializer.reg_weights_
             reg_precisions = initializer.reg_precisions_
         
@@ -444,6 +444,8 @@ class ClusterwiseLinModel():
         n, d = X.shape
         max_lower_bound = -np.infty
         self.converged_ = False
+        self.is_fitted_ = False
+
         # Check shape of y and fix if needed
         if y.shape != (n, 1):
             y.shape = (n, 1)
@@ -516,7 +518,7 @@ class ClusterwiseLinModel():
         # Always do a final e-step to guarantee that the labels returned by
         # fit_pred(X, y) are always consistent with fit(X, y).predict(X)
         # for any value of max_iter and tol (and any random_state).
-        _, log_resp, self.labels_, self.labels_X_, self.labels_y_ = self._e_step(X, y)
+        _, log_resp, labels_tr, labels_X, labels_y = self._e_step(X, y)
         self.resp_ = np.exp(log_resp)
 
         if not self.converged_:
@@ -530,10 +532,15 @@ class ClusterwiseLinModel():
         self._set_parameters(best_params)
         self.n_iter_ = best_n_iter
         self.lower_bound_ = max_lower_bound
+        self.resp_tr_ = np.exp(log_resp)
+        self.labels_tr_ =labels_tr
+        self.labels_X_ = labels_X
+        self.labels_y_ = labels_y
         self.low_bound_curves_ = best_curves
+        self.is_fitted_ = True
 
     def _e_step(self, X, y):
-        """E step.
+        """Expectation step.
 
         Parameters
         ----------
@@ -554,7 +561,7 @@ class ClusterwiseLinModel():
         log_weights = np.log(self.weights_)
         log_prob_X = _estimate_log_prob_X(X, self.means_, self.precisions_cholesky_)
         log_prob_y = _estimate_log_prob_y(X, y, self.reg_weights_, self.reg_precisions_)
-
+        
         # Compute the log-numerator of the responsibility expression
         weighted_log_prob = log_weights + log_prob_X + log_prob_y
         
@@ -573,7 +580,7 @@ class ClusterwiseLinModel():
         return log_prob_norm, log_resp, labels, labels_X, labels_y
 
     def _m_step(self, X, y, log_resp):
-        """M step.
+        """Maximization step.
 
         Parameters
         ----------
@@ -609,14 +616,16 @@ class ClusterwiseLinModel():
             reg_weights[:, k] = _estimate_regression_weights(X, 
                 y, resp_k=resp[:, k], reg_term_k=reg_term[k])
         self.reg_weights_ = reg_weights
-        
+
         # Update the output space precision terms
         means = np.dot(X_ext, self.reg_weights_)
         err = (np.tile(y, (1, K)) - means) ** 2
-        reg_precisions = n * self.weights_ / np.sum(resp * err)
+        product = np.multiply(resp + eps, err)        
+        reg_precisions = n * self.weights_ / np.sum(product, axis=0)
+
         self.reg_precisions_ = reg_precisions
 
-    def predict(self, X, labels=False):
+    def predict(self, X):
         """Estimate the values of the outputs for a new set of inputs.
 
         Compute the expected value of y given the trained model and a set
@@ -644,18 +653,18 @@ class ClusterwiseLinModel():
         with np.errstate(under='ignore'):
             # ignore underflow
             log_resp = weighted_log_prob - log_prob_norm[:, np.newaxis]
-        resp = np.exp(log_resp)
-        labels_ = log_resp.argmax(axis=1)
+        resp_tst = np.exp(log_resp)
+        labels_tst = log_resp.argmax(axis=1)
         
         # Compute the expected value of the predictive posterior.
-        eps = 10 * np.finfo(resp.dtype).eps
+        eps = 10 * np.finfo(resp_tst.dtype).eps
         dot_prod = np.dot(X_ext, self.reg_weights_)
-        y_ = np.sum((resp + eps) * dot_prod, axis=1)
+        y_ = np.sum((resp_tst + eps) * dot_prod, axis=1)
 
-        if labels:
-            return labels_, y_
-        else:
-            return y_
+        self.resp_tst_ = resp_tst
+        self.labels_tst_ = labels_tst
+
+        return y_
 
     def predict_score(self, X, y, metric='R2', labels=False):
         """Estimate and score the values of the outputs for a new set of inputs

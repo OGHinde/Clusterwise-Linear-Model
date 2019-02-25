@@ -132,10 +132,10 @@ def _estimate_log_prob_y_k(X, y, reg_weights_k, reg_precisions_k):
 
     # Extend X with a column of ones 
     X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
-
+    
     means = np.dot(X_ext, reg_weights_k.T)
     std_devs = np.sqrt(reg_precisions_k ** -1)
-    
+
     return norm.logpdf(y, loc=means, scale=std_devs)
 
 
@@ -271,10 +271,10 @@ def _estimate_regression_params_k(X, y, resp_k, reg_term_k, weight_k):
         reg_weights_k[t, 1:] = solver.coef_
 
     # Compute the output space precision terms
-    # CHECK THIS
     means = np.dot(X_ext, reg_weights_k.T)
     err = (y - means) ** 2
-    reg_precisions_k = n * weight_k / np.sum(np.multiply(resp_k + eps, err), axis=0)
+    product = np.multiply(resp_k + eps, err)
+    reg_precisions_k = n * weight_k / np.sum(product, axis=0)
     
     return reg_weights_k, reg_precisions_k
 
@@ -538,6 +538,8 @@ class ClusterwiseLinModel():
                 # E-Step and M-Step
                 log_prob_norm, log_resp, _, _, _ = self._e_step(X, y)
                 self._m_step(X, y, log_resp)
+
+                # Update lower bound
                 lower_bound = self._compute_lower_bound(log_prob_norm)
                 bound_curve.append(lower_bound)
 
@@ -679,14 +681,13 @@ class ClusterwiseLinModel():
             reg_term = reg_term[np.newaxis, :]
         
         # Update the mixture weights
-        weights = resp_task.sum(axis=0) + eps
-        self.weights_ = weights/n
+        weights = (resp_task.sum(axis=0) + eps)/n
 
         # Update input space mixture parameters
         (_, 
-        self.means_, 
-        self.covariances_) = _estimate_gaussian_parameters(X, resp_task, self.reg_covar)        
-        self.precisions_cholesky_ = _compute_precision_cholesky(self.covariances_)
+        means, 
+        covariances) = _estimate_gaussian_parameters(X, resp_task, self.reg_covar)        
+        precisions_cholesky = _compute_precision_cholesky(self.covariances_)
 
         # Update the output space regression weights
         reg_weights = np.empty((self.n_targets_, self.n_input_dims_+1, self.n_components))
@@ -698,6 +699,10 @@ class ClusterwiseLinModel():
                                                                    reg_term[:, k],
                                                                    weights[k])
         
+        self.weights_ = weights
+        self.means_
+        self.covariances_
+        self.precisions_cholesky_
         self.reg_weights_ = reg_weights.squeeze()
         self.reg_precisions_ = reg_precisions.squeeze()
 

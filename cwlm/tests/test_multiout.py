@@ -14,7 +14,8 @@ home = str(Path.home())
 import sys
 sys.path.append(home + '/Git/Clusterwise_Linear_Model/')
 
-from cwlm.mt_cwlm import ClusterwiseLinModel as CWLM
+from cwlm.clusterwise_linear_model import ClusterwiseLinModel as CWLM
+from cwlm.clusterwise_linear_model_mt import ClusterwiseLinModel as MT_CWLM
 from cwlm.gmm_regressor import GMMRegressor
 from cwlm.kmeans_regressor import KMeansRegressor
 
@@ -31,13 +32,14 @@ print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
 n_tr = 500  # number of training samples
 n_tst = 100 # number of testsamples
 d = 1       # number of input dimensions
-t = 1       # number of tasks
-K = 2       # number of clusters
+t = 2       # number of tasks
+K = 3       # number of clusters
 plot = True
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
-model = 'CWLM'
-seed = None
+#model = 'CWLM'
+model = 'MT_CWLM'
+seed = 1
 
 print('Test parameters:')
 print('\t- Training samples = ', n_tr)
@@ -52,7 +54,17 @@ if model == 'KMeansRegressor':
 elif model == 'GMMRegressor':
     model = GMMRegressor(n_components=K)
 elif model == 'CWLM':
-    model = CWLM(n_components=K, init_params='kmeans', plot=True)
+    model = CWLM(n_components=K, 
+                 init_params='kmeans', 
+                 plot=plot, 
+                 tol=1e-10, 
+                 n_init=10)
+elif model == 'MT_CWLM':
+    model = MT_CWLM(n_components=K, 
+                    init_params='kmeans', 
+                    plot=plot, 
+                    tol=1e-10, 
+                    n_init=10)
 else:
     print('\nIncorrect model specified')
     sys.exit(0)
@@ -115,6 +127,7 @@ if plot:
         est_weights = est_weights[np.newaxis, :, :]
         labels_tr = labels_tr[:, np.newaxis]
         labels_tst = labels_tst[:, np.newaxis]        
+        y_pred = y_pred[:, np.newaxis]
 
     for task in range(t):
         for k in range(K):

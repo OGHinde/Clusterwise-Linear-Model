@@ -107,8 +107,8 @@ y_pred = model.predict(X_tst)
 print('\nDone!')
 if plot:    
     est_weights = model.reg_weights_
-    labels_tst = model.labels_tst_
     labels_tr = model.labels_tr_
+    labels_tst = model.labels_tst_
     X_tr_ext = np.concatenate((np.ones((n_tr, 1)), X_tr), axis=1)
     if est_weights.ndim == 2:
         # Make sure we can iterate even if there's only one task.

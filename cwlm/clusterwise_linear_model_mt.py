@@ -12,6 +12,7 @@ TODO:
 ISSUES:
     - Weirdness in the lower bound results indicates that something's not
       quite right.
+    - Turns out this version is a little faster?? LOL Wut?  
 
 NEXT STEPS:
     - Pruning of weak clusters.
@@ -831,7 +832,7 @@ class ClusterwiseLinModel():
         -------
         score : int
         """
-        _, score = self.predict_score(self, X, y, metric)
+        _, score = self.predict_score(X, y, metric)
 
     def _compute_lower_bound(self, log_prob_norm):
         """Compute the model's complete data log likelihood.

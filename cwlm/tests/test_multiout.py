@@ -4,6 +4,7 @@
     Python Version: 3.6
 """
 
+from time import time
 import numpy as np
 #from sklearn.linear_model import Ridge
 import matplotlib.pyplot as plt
@@ -32,14 +33,14 @@ print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
 n_tr = 500      # number of training samples
 n_tst = 100     # number of testsamples
 d = 1           # number of input dimensions
-t = 2           # number of tasks
-K = 3           # number of clusters
-plot = True
+t = 1           # number of tasks
+K = 2           # number of clusters
+plot = False
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
 #model = 'CWLM'
 model = 'MT_CWLM'
-seed = None
+seed = 0
 
 print('Test parameters:')
 print('\t- Training samples = ', n_tr)
@@ -114,10 +115,14 @@ for k in range(K):
         RandomState=RandomState)
 
 # MODEL EVALUATION
+start = time()
 print('Fitting model...')
 model.fit(X_tr, y_tr)
-y_pred = model.predict(X_tst)
-#%%
+stop = time()
+print('Training time = ', stop - start)
+y_pred, score = model.predict_score(X_tst, y_tst)
+print('\nTest R2 score = ', score)
+
 print('\nDone!')
 if plot:    
     est_weights = model.reg_weights_
@@ -136,7 +141,6 @@ if plot:
             idx = labels_tr[:, task] == k
             idx = idx.squeeze()
             aux_y = np.dot(X_tr_ext[idx, :], est_weights[task, :, k])
-            aux_y = aux_y
             plt.scatter(X_tr[idx, :], y_tr[idx, task])
             plt.plot(np.sort(X_tr[idx, :]), aux_y, c='r')
         plt.title('Fitted model for task %d'%task)

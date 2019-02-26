@@ -666,7 +666,7 @@ class ClusterwiseLinModel():
 
         return y_
 
-    def predict_score(self, X, y, metric='R2', labels=False):
+    def predict_score(self, X, y, metric='R2'):
         """Estimate and score the values of the outputs for a new set of inputs
 
         Compute the expected value of y given the trained model and a set X of 
@@ -683,10 +683,8 @@ class ClusterwiseLinModel():
         y : array, shape (n_samples, 1)
         score : int
         """
-        if labels:
-            labels_, y_ = self.predict(X, labels=labels)
-        else:
-            y_ = self.predict(X, labels=labels)
+        
+        y_ = self.predict(X)
         
         if metric == 'MSE':
             score = mean_squared_error(y, y_)
@@ -694,16 +692,34 @@ class ClusterwiseLinModel():
             score = r2_score(y, y_)
         elif metric == 'MAE':
             score = mean_absolute_error(y, y_)    
+        elif metric == 'MAPE':
+            score = mean_absolute_percentage_error(y, y_est)
         elif metric == 'all': 
-            score = [r2_score(y, y_), mean_squared_error(y, y_), mean_absolute_error(y, y_)]
+            score = [r2_score(y, y_), 
+                     mean_squared_error(y, y_), 
+                     mean_absolute_error(y, y_), 
+                     mean_absolute_percentage_error(y, y_est)]
         else:
-            print("Wrong score metric specified. Must be either 'MSE', 'MAE', 'R2' or 'all'.")
+            print("""Wrong score metric specified. Must be either 
+                  'MSE', 'MAE', 'R2' or 'all'.""")
             return
 
-        if labels:
-            return labels_, y_, score
-        else:
-            return y_, score
+        return y_, score
+
+    def score(self, X, y, metric='R2'):
+        """Score the values of the outputs for a new set of inputs
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+        y_real : array-like, shape (n_samples, 1)
+
+
+        Returns
+        -------
+        score : int
+        """
+        _, score = self.predict_score(X, y, metric)
 
     def _compute_lower_bound(self, log_prob_norm):
         """We'll do it like this for now.

@@ -21,7 +21,7 @@ import sys
 sys.path.append(home + '/Git/Clusterwise_Linear_Model/')
 
 import numpy as np
-from cwlm.clusterwise_linear_model import ClusterwiseLinModel as CWLM
+from cwlm.clusterwise_linear_model_mt import ClusterwiseLinModel as CWLM
 from sklearn.mixture import GaussianMixture as GMM
 import matplotlib.pyplot as plt
 import pickle
@@ -40,7 +40,7 @@ n2_tst = 100
 n3_tst = 100
 n_tr = n1 + n2 + n3
 n_tst = n1_tst + n2_tst + n3_tst
-n_outliers = 10
+n_outliers = 50
 
 W =  np.array([[1, -2],
                [0, 0],
@@ -136,7 +136,7 @@ fig = plt.figure(2)
 plt.title('Responsability Clustering')
 lab = [2, 1, 0]
 for k in range(K):
-    idx = np.where(cwlm.labels_ == lab[k])[0]
+    idx = np.where(cwlm.labels_tr_ == lab[k])[0]
     plt.scatter(X[idx], y[idx], color=c[k], marker='x')
     w = W_clust[:, k]
     y_est = np.dot(mu_ext[k,:], w)

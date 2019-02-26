@@ -33,14 +33,14 @@ print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
 n_tr = 500      # number of training samples
 n_tst = 100     # number of testsamples
 d = 1           # number of input dimensions
-t = 1           # number of tasks
-K = 2           # number of clusters
-plot = False
+t = 2           # number of tasks
+K = 3           # number of clusters
+plot = True
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
 #model = 'CWLM'
 model = 'MT_CWLM'
-seed = 0
+seed = None
 
 print('Test parameters:')
 print('\t- Training samples = ', n_tr)

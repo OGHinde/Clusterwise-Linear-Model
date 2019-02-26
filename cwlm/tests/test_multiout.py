@@ -1,11 +1,11 @@
-"""
-Created on Thu Feb 14 10:48:25 2019
+""" TEST MODULE FOR THE CLUSTERWISE REGRESSION MODEL
 
-@author: oghinde
+    Author: Óscar García Hinde <oghinde@tsc.uc3m.es>
+    Python Version: 3.6
 """
 
 import numpy as np
-from sklearn.linear_model import Ridge
+#from sklearn.linear_model import Ridge
 import matplotlib.pyplot as plt
 
 # Add our module to PATH
@@ -29,11 +29,11 @@ def compute_targets(X, coefs, intercepts, RandomState, noise_var=0.5):
 
 print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
 
-n_tr = 500  # number of training samples
-n_tst = 100 # number of testsamples
-d = 1       # number of input dimensions
-t = 2       # number of tasks
-K = 3       # number of clusters
+n_tr = 500      # number of training samples
+n_tst = 100     # number of testsamples
+d = 1           # number of input dimensions
+t = 2           # number of tasks
+K = 3           # number of clusters
 plot = True
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
@@ -56,13 +56,15 @@ elif model == 'GMMRegressor':
 elif model == 'CWLM':
     model = CWLM(n_components=K, 
                  init_params='kmeans', 
-                 plot=plot, 
+                 plot=plot,
+                 smoothing=True,
                  tol=1e-10, 
                  n_init=10)
 elif model == 'MT_CWLM':
     model = MT_CWLM(n_components=K, 
                     init_params='gmm', 
-                    plot=plot, 
+                    plot=plot,
+                    smoothing=True,
                     tol=1e-10, 
                     n_init=10)
 else:
@@ -115,7 +117,7 @@ for k in range(K):
 print('Fitting model...')
 model.fit(X_tr, y_tr)
 y_pred = model.predict(X_tst)
-
+#%%
 print('\nDone!')
 if plot:    
     est_weights = model.reg_weights_
@@ -136,7 +138,7 @@ if plot:
             aux_y = np.dot(X_tr_ext[idx, :], est_weights[task, :, k])
             aux_y = aux_y
             plt.scatter(X_tr[idx, :], y_tr[idx, task])
-            plt.plot(X_tr[idx, :], aux_y, c='r')
+            plt.plot(np.sort(X_tr[idx, :]), aux_y, c='r')
         plt.title('Fitted model for task %d'%task)
         plt.show()
         

@@ -1,4 +1,4 @@
-"""CLUSTERWISE LINEAR REGRESSION MODEL
+"""CLUSTERWISE LINEAR REGRESSION MODEL - MULTI-TASK
 
     Author: Óscar García Hinde <oghinde@tsc.uc3m.es>
     Python Version: 3.6
@@ -40,9 +40,9 @@ def mean_absolute_percentage_error(y_true, y_pred, multitarget=None):
     """Mean absolute precentage error regression loss.
     TODO: multi target.
     ----------
-    y_true : array-like of shape = (n_samples) or (n_samples, n_targets)
+    y_true : array-like, shape = (n_samples) or (n_samples, n_targets)
         Ground truth (correct) target values.
-    y_pred : array-like of shape = (n_samples) or (n_samples, n_targets)
+    y_pred : array-like, shape = (n_samples) or (n_samples, n_targets)
         Estimated target values.
 
     Returns
@@ -232,7 +232,9 @@ def _compute_precision_cholesky(covariances):
             cov_chol = linalg.cholesky(covariance, lower=True)
         except linalg.LinAlgError:
             raise ValueError(estimate_precision_error_message)
-        precisions_chol[k] = linalg.solve_triangular(cov_chol, np.eye(n_features), lower=True).T
+        precisions_chol[k] = linalg.solve_triangular(cov_chol, 
+                                                     np.eye(n_features), 
+                                                     lower=True).T
     
     return precisions_chol
 
@@ -340,8 +342,8 @@ class ClusterwiseLinModel():
         The user-provided initial precisions (inverse of the covariance matrices)
         for the Gaussian Mixture model at input space.
         
-    reg_weights_init : array-like, shape (n_targets, n_components, n_features + 1), optional
-        The user-provided initial means, defaults to None,
+    reg_weights_init : array-like, shape (n_targets, n_components, n_features + 1), 
+        optional The user-provided initial means, defaults to None,
         If it None, means are initialized using the `init_params` method.
     
     reg_precisions_init : array-like, shape (n_targets, n_components), optional.
@@ -381,8 +383,8 @@ class ClusterwiseLinModel():
     def __init__(self, n_components=5, eta=1, tol=1e-10, reg_covar=1e-6,
                  max_iter=200, n_init=10, init_params='gmm', smoothing=False, 
                  smooth_window=20, weights_init=None, means_init=None, 
-                 covariances_init=None, reg_weights_init=None, reg_precisions_init=None, 
-                 random_seed=None, plot=False):
+                 covariances_init=None, reg_weights_init=None, 
+                 reg_precisions_init=None, random_seed=None, plot=False):
         self.weights_init = weights_init                # Pi_k in the notes
         self.means_init = means_init                    # mu_k in the notes
         self.covariances_init = covariances_init        # Sigma_k in the notes              
@@ -446,7 +448,8 @@ class ClusterwiseLinModel():
         n, d = X.shape
 
         if self.init_params == 'kmeans':
-            initializer = KMeansRegressor(n_components=self.n_components, alpha=self.eta)
+            initializer = KMeansRegressor(n_components=self.n_components, 
+                                          alpha=self.eta)
             initializer.fit(X, y)
             resp = np.zeros((n, self.n_components))
             resp[np.arange(n), initializer.labels_tr_] = 1
@@ -454,8 +457,10 @@ class ClusterwiseLinModel():
             reg_precisions = initializer.reg_precisions_
 
         elif self.init_params == 'gmm':
-            initializer = GMMRegressor(n_components=self.n_components, alpha=self.eta, 
-                n_init=1, covariance_type='full')
+            initializer = GMMRegressor(n_components=self.n_components, 
+                                       alpha=self.eta, 
+                                       n_init=1, 
+                                       covariance_type='full')
             initializer.fit(X, y)
             resp = initializer.resp_tr_
             reg_weights = initializer.reg_weights_
@@ -472,7 +477,9 @@ class ClusterwiseLinModel():
             raise ValueError("Unimplemented initialization method '%s'"
                              % self.init_params)
 
-        weights, means, covariances = _estimate_gaussian_parameters(X, resp, self.reg_covar)
+        (weights, 
+        means, 
+        covariances) = _estimate_gaussian_parameters(X, resp, self.reg_covar)
         weights /= n
 
         self.weights_ = weights if self.weights_init is None else self.weights_init
@@ -485,8 +492,15 @@ class ClusterwiseLinModel():
             self.covariances_ = self.covariances_init
             self.precisions_cholesky_ = _compute_precision_cholesky(self.covariances_)
 
-        self.reg_weights_ = reg_weights if self.reg_weights_init is None else self.reg_weights_init
-        self.reg_precisions_ = reg_precisions if self.reg_precisions_init is None else self.reg_precisions_init
+        if self.reg_weights_init is None:
+            self.reg_weights_ = reg_weights  
+        else: 
+            self.reg_weights_ = self.reg_weights_init
+        
+        if self.reg_precisions_init is None:
+            self.reg_precisions_ = reg_precisions  
+        else: 
+            self.reg_precisions_ = self.reg_precisions_init
 
     def fit(self, X, y):
         """Fit the clustered linear regressor model for a training 
@@ -674,7 +688,8 @@ class ClusterwiseLinModel():
         resp_task = np.exp(log_resp.sum(axis=1))
         eps = 10 * np.finfo(resp.dtype).eps
 
-        # Regularization term (equivalent to Gaussian prior on the regression weights)
+        # Regularization term 
+        # Equivalent to Gaussian prior on the regression weights
         reg_term = self.eta / (self.reg_precisions_ + eps)
         # Make sure we can iterate when n_targets = 1
         if self.n_targets_ == 1:
@@ -686,11 +701,13 @@ class ClusterwiseLinModel():
         # Update input space mixture parameters
         (_, 
         means, 
-        covariances) = _estimate_gaussian_parameters(X, resp_task, self.reg_covar)        
+        covariances) = _estimate_gaussian_parameters(X, resp_task, self.reg_covar)      
         precisions_cholesky = _compute_precision_cholesky(self.covariances_)
 
-        # Update the output space regression weights
-        reg_weights = np.empty((self.n_targets_, self.n_input_dims_+1, self.n_components))
+        # Update the output space regression parameters
+        reg_weights = np.empty((self.n_targets_, 
+                                self.n_input_dims_+1, 
+                                self.n_components))
         reg_precisions = np.zeros((self.n_targets_, self.n_components))
         for k in range(self.n_components):
             (reg_weights[:, :, k], 
@@ -772,11 +789,11 @@ class ClusterwiseLinModel():
         Parameters
         ----------
         X : array-like, shape (n_samples, n_features)
-        y_real : array-like, shape (n_samples, 1)
+        y_real : array-like, shape (n_samples, n_targets)
 
         Returns
         -------
-        y : array, shape (n_samples, 1)
+        y : array, shape (n_samples, n_targets)
         score : int
         """
         y_est = self.predict(X)
@@ -795,10 +812,26 @@ class ClusterwiseLinModel():
                      mean_absolute_error(y, y_est), 
                      mean_absolute_percentage_error(y, y_est)]
         else:
-            print("Wrong score metric specified. Must be either 'MSE', 'MAE', 'R2' or 'all'.")
+            print("""Wrong score metric specified. Must be either 
+                  'MSE', 'MAE', 'R2', 'MAPE' or 'all'.""")
             return
 
         return y_est, score
+
+    def score(self, X, y, metric='R2'):
+        """Score the values of the outputs for a new set of inputs
+
+        Parameters
+        ----------
+        X : array-like, shape (n_samples, n_features)
+        y_real : array-like, shape (n_samples, n_targets)
+
+
+        Returns
+        -------
+        score : int
+        """
+        _, score = self.predict_score(self, X, y, metric)
 
     def _compute_lower_bound(self, log_prob_norm):
         """Compute the model's complete data log likelihood.

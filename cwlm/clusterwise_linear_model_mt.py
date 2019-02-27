@@ -51,11 +51,10 @@ def mean_absolute_percentage_error(y_true, y_pred, multitarget=None):
     loss : float or ndarray of floats
         A non-negative floating point value (the best value is 0.0), or an
         array of floating point values, one for each individual target.
-    """
-    y_true = check_array(y_true)
-    y_pred = check_array(y_pred)
+    """    
 
     return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
 
 ###############################################################################
 # USED IN THE E STEP 

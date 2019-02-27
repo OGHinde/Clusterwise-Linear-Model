@@ -120,8 +120,10 @@ print('Fitting model...')
 model.fit(X_tr, y_tr)
 stop = time()
 print('Training time = ', stop - start)
-y_pred, score = model.predict_score(X_tst, y_tst)
-print('\nTest R2 score = ', score)
+y_pred, scores = model.predict_score(X_tst, y_tst, metric='all')
+print('\nTest scores:')
+for key, value in scores.items():
+    print('\t- ', key, '=', value)
 
 print('\nDone!')
 if plot:    

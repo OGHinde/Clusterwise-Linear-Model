@@ -807,10 +807,10 @@ class ClusterwiseLinModel():
         elif metric == 'MAPE':
             score = mean_absolute_percentage_error(y, y_est)
         elif metric == 'all': 
-            score = [r2_score(y, y_est), 
-                     mean_squared_error(y, y_est), 
-                     mean_absolute_error(y, y_est), 
-                     mean_absolute_percentage_error(y, y_est)]
+            score = {'R2': r2_score(y, y_est), 
+                     'MSE': mean_squared_error(y, y_est), 
+                     'MAE': mean_absolute_error(y, y_est), 
+                     'MAPE': mean_absolute_percentage_error(y, y_est)}
         else:
             print("""Wrong score metric specified. Must be either 
                   'MSE', 'MAE', 'R2', 'MAPE' or 'all'.""")

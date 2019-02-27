@@ -15,6 +15,7 @@ home = str(Path.home())
 import sys
 sys.path.append(home + '/Git/Clusterwise_Linear_Model/')
 
+import pickle
 from cwlm.clusterwise_linear_model import ClusterwiseLinModel as CWLM
 from cwlm.clusterwise_linear_model_mt import ClusterwiseLinModel as MT_CWLM
 from cwlm.gmm_regressor import GMMRegressor
@@ -36,6 +37,7 @@ d = 1           # number of input dimensions
 t = 2           # number of tasks
 K = 3           # number of clusters
 plot = True
+save_data = True
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
 #model = 'CWLM'
@@ -157,3 +159,23 @@ if plot:
         plt.title('Model predictions for task %d'%task)
         plt.show()
 
+if save_data:
+    data = {'X_tr': X_tr,
+            'y_tr': y_tr,
+            'X_tst': X_tr,
+            'y_tst': y_tr,
+            'Trained model': model}
+    while True:
+        challenge = input('Save dataset? y/n: ')
+        if challenge == 'y':    
+            name = input('Specify file name: ')    
+            print('Saving dataset as', name + '.pickle')
+            with open('example_datasets/' + name + '.pickle', 'wb') as f:
+                pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+            print('Done!')
+            break
+        elif challenge == 'n':
+            print('Dataset discarded.')
+            break
+        else:
+            print("Wrong input. Please type 'y' or 'n'.")

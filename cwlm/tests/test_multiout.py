@@ -5,7 +5,6 @@
 """
 
 from time import time
-import datetime
 import numpy as np
 #from sklearn.linear_model import Ridge
 import matplotlib.pyplot as plt
@@ -22,6 +21,13 @@ from cwlm.clusterwise_linear_model_mt import ClusterwiseLinModel as MT_CWLM
 from cwlm.gmm_regressor import GMMRegressor
 from cwlm.kmeans_regressor import KMeansRegressor
 
+def time_format(seconds):
+    """Display a time given in seconds in a more pleasing manner.
+    """
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
+
+    return '{:.0f} hours, {:.0f} minutes {:.3f} seconds'.format(h, m, s)
 
 def compute_targets(X, coefs, intercepts, RandomState, noise_var=0.5):
     n, d = X.shape
@@ -37,13 +43,19 @@ n_tst = 100     # number of testsamples
 d = 1           # number of input dimensions
 t = 2           # number of tasks
 K = 3           # number of clusters
-plot = True
+seed = None
+plot_data = True
 save_data = True
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
 #model = 'CWLM'
 model = 'MT_CWLM'
-seed = None
+plot_bounds = False
+
+if d > 1 & plot_data == True:
+    print('''\nWarning: Too many dimensions to plot. 
+          Plotting defaulted to False.''')
+    plot_data = False
 
 print('Test parameters:')
 print('\t- Training samples = ', n_tr)
@@ -60,14 +72,14 @@ elif model == 'GMMRegressor':
 elif model == 'CWLM':
     model = CWLM(n_components=K, 
                  init_params='kmeans', 
-                 plot=False,
+                 plot=plot_bounds,
                  smoothing=True,
                  tol=1e-10, 
                  n_init=10)
 elif model == 'MT_CWLM':
     model = MT_CWLM(n_components=K, 
                     init_params='gmm', 
-                    plot=False,
+                    plot=plot_bounds,
                     smoothing=True,
                     tol=1e-10, 
                     n_init=10)
@@ -77,10 +89,6 @@ else:
 
 RandomState = (np.random.RandomState(seed) if seed != None 
                else np.random.RandomState())
-
-if d > 1 & plot == True:
-    print('\nWarning: Too many dimensions to plot. Plotting defaulted to False.')
-    plot = False
 
 # DATA GENERATION
 print('\nGenerating data...')
@@ -122,10 +130,8 @@ start = time()
 print('Fitting model...')
 model.fit(X_tr, y_tr)
 stop = time()
-
-m, s = divmod(stop - start, 60)
-h, m = divmod(m, 60)
-print('{:.0f} hours, {:.0f} minutes {:.3f} seconds'.format(h, m, s)) # Python 3
+elapsed_time = time_format(stop-start)
+print('Training time =', elapsed_time)
 
 y_pred, scores = model.predict_score(X_tst, y_tst, metric='all')
 print('\nTest scores:')
@@ -133,7 +139,7 @@ for key, value in scores.items():
     print('\t- ', key, '=', value)
 
 print('\nDone!')
-if plot:    
+if plot_data:    
     est_weights = model.reg_weights_
     labels_tr = model.labels_tr_
     labels_tst = model.labels_tst_

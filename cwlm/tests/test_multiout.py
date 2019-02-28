@@ -5,6 +5,7 @@
 """
 
 from time import time
+import datetime
 import numpy as np
 #from sklearn.linear_model import Ridge
 import matplotlib.pyplot as plt
@@ -59,14 +60,14 @@ elif model == 'GMMRegressor':
 elif model == 'CWLM':
     model = CWLM(n_components=K, 
                  init_params='kmeans', 
-                 plot=plot,
+                 plot=False,
                  smoothing=True,
                  tol=1e-10, 
                  n_init=10)
 elif model == 'MT_CWLM':
     model = MT_CWLM(n_components=K, 
                     init_params='gmm', 
-                    plot=plot,
+                    plot=False,
                     smoothing=True,
                     tol=1e-10, 
                     n_init=10)
@@ -121,7 +122,11 @@ start = time()
 print('Fitting model...')
 model.fit(X_tr, y_tr)
 stop = time()
-print('Training time = ', stop - start)
+
+m, s = divmod(stop - start, 60)
+h, m = divmod(m, 60)
+print('{:.0f} hours, {:.0f} minutes {:.3f} seconds'.format(h, m, s)) # Python 3
+
 y_pred, scores = model.predict_score(X_tst, y_tst, metric='all')
 print('\nTest scores:')
 for key, value in scores.items():

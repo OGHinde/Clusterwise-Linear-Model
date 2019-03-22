@@ -6,8 +6,8 @@
 TODO:
     - Implement parallelization with MPI.
     - Implement other input covariances.
-    - Revisit RandomState
-    - Update Attributes docstring.
+    - Revisit RandomState.
+    - Update docstring.
 
 ISSUES:
     - Weirdness in the lower bound results indicates that something's not
@@ -325,7 +325,7 @@ class ClusterwiseLinModel():
             'random' : weights are initialized randomly.
     
     smoothing : bool, defaults to False.
-        Wether or not to perform average smoothing on the evolution  of the 
+        Whether or not to perform average smoothing on the evolution  of the 
         lower bound. Can help converge quicker in ill conditioned databases.
 
     smooth_window : int, defaults to 20.

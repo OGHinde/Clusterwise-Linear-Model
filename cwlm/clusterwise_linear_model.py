@@ -27,8 +27,6 @@ from sklearn.linear_model import Ridge
 from cwlm.kmeans_regressor import KMeansRegressor
 from cwlm.gmm_regressor import GMMRegressor
 
-from mpi4py import MPI
-
 import warnings
 from sklearn.exceptions import ConvergenceWarning
 

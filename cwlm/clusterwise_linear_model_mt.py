@@ -33,7 +33,10 @@ from cwlm.gmm_regressor import GMMRegressor
 import warnings
 from sklearn.exceptions import ConvergenceWarning
 
+import matplotlib
+matplotlib.use("Pdf")
 import matplotlib.pyplot  as plt
+
 
 def mean_absolute_percentage_error(y_true, y_pred, multitarget=None):
     """Mean absolute precentage error regression loss.

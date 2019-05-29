@@ -704,7 +704,7 @@ class ClusterwiseLinModel():
         (_, 
         means, 
         covariances) = _estimate_gaussian_parameters(X, resp_task, self.reg_covar)      
-        precisions_cholesky = _compute_precision_cholesky(self.covariances_)
+        precisions_cholesky = _compute_precision_cholesky(covariances)
 
         # Calculate the output space regression parameters
         reg_weights = np.empty((self.n_targets_, 

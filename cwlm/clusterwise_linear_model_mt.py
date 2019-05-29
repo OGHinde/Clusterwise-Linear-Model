@@ -716,9 +716,9 @@ class ClusterwiseLinModel():
                                                                    weights[k])
         
         self.weights_ = weights
-        self.means_
-        self.covariances_
-        self.precisions_cholesky_
+        self.means_ = means
+        self.covariances_ = covariances
+        self.precisions_cholesky_ = precisions_cholesky
         self.reg_weights_ = reg_weights.squeeze()
         self.reg_precisions_ = reg_precisions.squeeze()
 

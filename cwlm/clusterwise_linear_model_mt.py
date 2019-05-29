@@ -697,16 +697,16 @@ class ClusterwiseLinModel():
         if self.n_targets_ == 1:
             reg_term = reg_term[np.newaxis, :]
         
-        # Update the mixture weights
+        # Calculate the mixture weights
         weights = (resp_task.sum(axis=0) + eps)/n
 
-        # Update input space mixture parameters
+        # Calculate input space mixture parameters
         (_, 
         means, 
         covariances) = _estimate_gaussian_parameters(X, resp_task, self.reg_covar)      
         precisions_cholesky = _compute_precision_cholesky(self.covariances_)
 
-        # Update the output space regression parameters
+        # Calculate the output space regression parameters
         reg_weights = np.empty((self.n_targets_, 
                                 self.n_input_dims_+1, 
                                 self.n_components))
@@ -718,6 +718,7 @@ class ClusterwiseLinModel():
                                                                    reg_term[:, k],
                                                                    weights[k])
         
+        # Update all the things
         self.weights_ = weights
         self.means_ = means
         self.covariances_ = covariances

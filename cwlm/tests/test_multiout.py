@@ -41,7 +41,7 @@ print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
 n_tr = 500      # number of training samples
 n_tst = 100     # number of testsamples
 d = 1           # number of input dimensions
-t = 2           # number of tasks
+t = 3           # number of tasks
 K = 3           # number of clusters
 seed = None
 plot_data = True
@@ -144,6 +144,9 @@ if plot_data:
     labels_tr = model.labels_tr_
     labels_tst = model.labels_tst_
     X_tr_ext = np.concatenate((np.ones((n_tr, 1)), X_tr), axis=1)
+    aux_X = np.concatenate((np.ones((2, 1)), 
+                            np.array([[np.min(X_tr)-1], [np.max(X_tr)+1]])), 
+                            axis=1)
     if est_weights.ndim == 2:
         # Make sure we can iterate even if there's only one task.
         est_weights = est_weights[np.newaxis, :, :]
@@ -155,9 +158,9 @@ if plot_data:
         for k in range(K):
             idx = labels_tr[:, task] == k
             idx = idx.squeeze()
-            aux_y = np.dot(X_tr_ext[idx, :], est_weights[task, :, k])
+            aux_y = np.dot(aux_X, est_weights[task, :, k])
             plt.scatter(X_tr[idx, :], y_tr[idx, task])
-            plt.plot(np.sort(X_tr[idx, :]), aux_y, c='r')
+            plt.plot(aux_X[:, 1], aux_y, 'k--')
         plt.title('Fitted model for task %d'%task)
         plt.show()
         
@@ -190,3 +193,5 @@ if save_data:
             break
         else:
             print("Wrong input. Please type 'y' or 'n'.")
+            
+            

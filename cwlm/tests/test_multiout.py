@@ -44,14 +44,14 @@ t = 2           # number of tasks
 K = 3           # number of clusters
 seed = None
 plot_data = True
-load_data = True
-save_data = True
+load_data = False
+save_data = False
+plot_bounds = False
 
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
 #model = 'CWLM'
 model = 'MT_CWLM'
-plot_bounds = False
 
 
 if d > 1 & plot_data == True:
@@ -61,11 +61,11 @@ if d > 1 & plot_data == True:
 
 print('Test parameters:')
 print('\t- Training samples = {}'.format(n_tr))
-print('\t- Test samples = '.format(n_tst))
-print('\t- Input dimensions ='.format(d))
-print('\t- Regression tasks ='.format(t))
-print('\t- Clusters ='.format(K))
-print('\t- Selected model:'.format(model))
+print('\t- Test samples = {}'.format(n_tst))
+print('\t- Input dimensions = {}'.format(d))
+print('\t- Regression tasks = {}'.format(t))
+print('\t- Number of clusters = {}'.format(K))
+print('\t- Selected model: {}'.format(model))
 
 if model == 'KMeansRegressor':
     model = KMeansRegressor(n_components=K)
@@ -93,6 +93,7 @@ else:
 RandomState = (np.random.RandomState(seed) if seed != None 
                else np.random.RandomState())
 
+# DATA GENERATION
 if load_data:
     while True:
         filename = input('Specify file name: ')
@@ -160,16 +161,13 @@ y_pred, scores = model.predict_score(X_tst, y_tst, metric='all')
 print('\nTest scores:')
 for key, value in scores.items():
     print('\t- {} = {:.3f}'.format(key, value))
-
 print('\nDone!')
+
+# PLOTTING
 if plot_data:    
     est_weights = model.reg_weights_
     labels_tr = model.labels_tr_
     labels_tst = model.labels_tst_
-    X_tr_ext = np.concatenate((np.ones((n_tr, 1)), X_tr), axis=1)
-    aux_X = np.concatenate((np.ones((2, 1)), 
-                            np.array([[np.min(X_tr)-1], [np.max(X_tr)+1]])), 
-                            axis=1)
         
     if est_weights.ndim == 2:
         # Make sure we can iterate even if there's only one task.
@@ -177,36 +175,29 @@ if plot_data:
         labels_tr = labels_tr[:, np.newaxis]
         labels_tst = labels_tst[:, np.newaxis]
         y_pred = y_pred[:, np.newaxis]
-
+    
     for task in range(t):
+        figure, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex=False, figsize=(6, 6))
         for k in range(K):
-            idx = labels_tr[:, task] == k
-            idx = idx.squeeze()
-            aux_y = np.dot(aux_X, est_weights[task, :, k])
-            plt.scatter(X_tr[idx, :], y_tr[idx, task])
-            plt.plot(aux_X[:, 1], aux_y, 'k--')
-        plt.title('Fitted model for task %d'%task)
-        plt.show()
-        
-    for task in range(t):
-        for k in range(K):
-            idx = labels_tr[:, task] == k
-            idx = idx.squeeze()
-            aux_y = np.dot(X_tr_ext[idx, :], est_weights[task, :, k])
-            plt.scatter(X_tr[idx, :], y_tr[idx, task])
-            plt.plot(np.sort(X_tr[idx, :]), aux_y, c='r')
-        plt.title('Fitted model for task %d'%task)
-        plt.show()
-        
-    for task in range(t):
-        for k in range(K):
-            idx = labels_tst == k
-            idx = idx.squeeze()
-            plt.scatter(X_tst[idx, :], y_tst[idx, task])
-            plt.scatter(X_tst[idx, :], y_pred[idx, task], c='r', marker='.')
-        plt.title('Model predictions for task %d'%task)
-        plt.show()
-        
+            idx_tr = (labels_tr[:, task] == k).squeeze()
+            idx_tst = (labels_tst == k).squeeze()
+            
+            aux_X = np.sort(X_tr[idx_tr, :], axis=0)[[0, -1]]
+            aux_X_ext = np.hstack((np.ones((2, 1)), aux_X))
+            aux_y = np.dot(aux_X_ext, est_weights[task, :, k])
+            ax1.scatter(X_tr[idx_tr, :], y_tr[idx_tr, task])
+            ax1.plot(aux_X, aux_y, 'k--')
+            
+            ax2.scatter(X_tst[idx_tst, :], y_tst[idx_tst, task])
+            ax2.scatter(X_tst[idx_tst, :], y_pred[idx_tst, task], c='r', marker='.')
+        ax1.set_title('Fitted model')
+        ax2.set_title('Model predictions')
+        figure.tight_layout()
+        st = figure.suptitle('Results for task {}'.format(task+1), fontsize=12, fontweight='bold')
+        st.set_y(0.98)
+        figure.subplots_adjust(top=0.85)
+          
+# SAVING MODEL
 if save_data:
     data = {'X_tr': X_tr,
             'y_tr': y_tr,

@@ -436,7 +436,7 @@ class ClusterwiseLinModel():
 
         return t, n, d, X, y
 
-    def _initialise(self, X, y, RandomState):
+    def _initialise(self, X, y, random_state):
         """Initialization of the Clusterwise Linear Model parameters.    
 
         Parameters
@@ -451,7 +451,8 @@ class ClusterwiseLinModel():
 
         if self.init_params == 'kmeans':
             initializer = KMeansRegressor(n_components=self.n_components, 
-                                          alpha=self.eta)
+                                          alpha=self.eta,
+                                          random_state=random_state)
             initializer.fit(X, y)
             resp = np.zeros((n, self.n_components))
             resp[np.arange(n), initializer.labels_tr_] = 1
@@ -462,7 +463,8 @@ class ClusterwiseLinModel():
             initializer = GMMRegressor(n_components=self.n_components, 
                                        alpha=self.eta, 
                                        n_init=1, 
-                                       covariance_type='full')
+                                       covariance_type='full',
+                                       random_state=random_state)
             initializer.fit(X, y)
             resp = initializer.resp_tr_
             reg_weights = initializer.reg_weights_
@@ -552,8 +554,8 @@ class ClusterwiseLinModel():
                     prev_lower_bound = lower_bound
 
                 # E-Step and M-Step
-                log_prob_norm, log_resp, _, _, _ = self._e_step(X, y)
-                self._m_step(X, y, log_resp)
+                log_prob_norm, log_resp = self._e_step(X, y, labels=False)
+                self._m_step(X, y, np.exp(log_resp))
 
                 # Update lower bound
                 lower_bound = self._compute_lower_bound(log_prob_norm)
@@ -600,7 +602,8 @@ class ClusterwiseLinModel():
         # Always do a final e-step to guarantee that the labels returned by
         # fit_pred(X, y) are always consistent with fit(X, y).predict(X)
         # for any value of max_iter and tol (and any random_state).
-        _, log_resp, labels_tr, labels_X, labels_y = self._e_step(X, y)
+        _, log_resp, labels_tr, labels_X, labels_y = self._e_step(X, y, labels=True)
+        self._m_step(X, y, np.exp(log_resp))
 
         if not self.converged_:
             warnings.warn('Initialization %d did not converge. '
@@ -619,13 +622,14 @@ class ClusterwiseLinModel():
         self.low_bound_curves_ = best_curves
         self.is_fitted_ = True
 
-    def _e_step(self, X, y):
+    def _e_step(self, X, y, labels):
         """Expectation step.
 
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features)
-        y : array-like, shape (n_samples, n_targets)
+        X      : array-like, shape (n_samples, n_features)
+        y      : array-like, shape (n_samples, n_targets)
+        labels : boolean. If True, returns all hard labels.
 
         Returns
         -------
@@ -666,13 +670,15 @@ class ClusterwiseLinModel():
                 log_resp[:, :, k] = weighted_log_prob[:, :, k] - log_prob_norm
         
         # Compute labels from all viewpoints
-        labels_X = log_prob_X.argmax(axis=1)
-        labels_y = log_prob_y.argmax(axis=2)
-        labels = log_resp.argmax(axis=2)
+        if labels:
+            labels_X = log_prob_X.argmax(axis=1)
+            labels_y = log_prob_y.argmax(axis=2)
+            labels = log_resp.argmax(axis=2)
+            return log_prob_norm, log_resp, labels, labels_X, labels_y
+        else:
+            return log_prob_norm, log_resp
 
-        return log_prob_norm, log_resp, labels, labels_X, labels_y
-
-    def _m_step(self, X, y, log_resp):
+    def _m_step(self, X, y, resp):
         """Maximization step.
 
         Parameters
@@ -686,8 +692,9 @@ class ClusterwiseLinModel():
             the point of each sample in X.
         """
         n, d = X.shape
-        resp = np.exp(log_resp)
-        resp_task = np.exp(log_resp.sum(axis=1))
+        #resp = np.exp(log_resp)
+        #resp_task = np.exp(log_resp.mean(axis=1)) # ¿?
+        resp_task = resp.mean(axis=1) # ¿?
         eps = 10 * np.finfo(resp.dtype).eps
 
         # Regularization term 

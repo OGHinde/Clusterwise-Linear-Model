@@ -109,12 +109,14 @@ class GMMRegressor(object):
         Log-likelihood of the best fit of EM.
 
     """
-    def __init__(self, n_components=8, alpha=1, n_init=10, covariance_type='diag', verbose=0):
+    def __init__(self, n_components=8, alpha=1, n_init=10, covariance_type='diag', 
+                 verbose=0, random_state=None):
         self.n_components = n_components
         self.alpha = alpha
         self.covariance_type = covariance_type
         self.n_init = n_init
         self.verbose = verbose
+        self.random_state = random_state
         
     def _check_data(self, X, y):
         """Check that the input data is correctly formatted.
@@ -160,7 +162,9 @@ class GMMRegressor(object):
         eps = 10 * np.finfo(float).eps
         
         # Determine training sample/component posterior probability
-        gmm = GMM(n_components=self.n_components, n_init=self.n_init)
+        gmm = GMM(n_components=self.n_components, 
+                  n_init=self.n_init, 
+                  random_state=self.random_state)
         gmm.fit(X)
         resp_tr = gmm.predict_proba(X)
         labels_tr = np.argmax(resp_tr, axis=1)

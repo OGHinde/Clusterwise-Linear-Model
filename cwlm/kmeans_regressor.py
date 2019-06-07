@@ -10,13 +10,14 @@ from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
 
 class KMeansRegressor(object):
-    def __init__(self, n_components=8, alpha=1, n_init=10, verbose=False):
+    def __init__(self, n_components=8, alpha=1, n_init=10, verbose=False, random_state=None):
         self.n_components_ = n_components
         self.alpha_ = alpha
         self.n_init = n_init
         self.kmeans_ = KMeans(n_clusters=self.n_components_, n_init=n_init)
         self.verbose = verbose
         self.regs_ = []
+        self.random_state = random_state
         for k in range(self.n_components_):
             self.regs_.append(Ridge(alpha=self.alpha_))
     
@@ -66,7 +67,7 @@ class KMeansRegressor(object):
         """
         self.is_fitted_ = False
         t, n, d, X_tr, y_tr = self._check_data(X_tr, y_tr)
-        labels_tr = self.kmeans_.fit_predict(X_tr)
+        labels_tr = self.kmeans_.fit_predict(X_tr, random_state=self.random_state)
         reg_weights = np.empty((t, d+1, self.n_components_))
         reg_precisions = np.zeros((t, self.n_components_))
 

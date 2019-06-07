@@ -41,7 +41,7 @@ print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
 n_tr = 500      # number of training samples
 n_tst = 100     # number of testsamples
 d = 1           # number of input dimensions
-t = 3           # number of tasks
+t = 2           # number of tasks
 K = 3           # number of clusters
 seed = None
 plot_data = True
@@ -75,7 +75,8 @@ elif model == 'CWLM':
                  plot=plot_bounds,
                  smoothing=True,
                  tol=1e-10, 
-                 n_init=10)
+                 n_init=10,
+                 random_seed=1)
 elif model == 'MT_CWLM':
     model = MT_CWLM(n_components=K, 
                     init_params='gmm', 
@@ -136,7 +137,7 @@ print('Training time =', elapsed_time)
 y_pred, scores = model.predict_score(X_tst, y_tst, metric='all')
 print('\nTest scores:')
 for key, value in scores.items():
-    print('\t- ', key, '=', value)
+    print('\t- {} = {:.3f}'.format(key, value))
 
 print('\nDone!')
 if plot_data:    
@@ -151,7 +152,7 @@ if plot_data:
         # Make sure we can iterate even if there's only one task.
         est_weights = est_weights[np.newaxis, :, :]
         labels_tr = labels_tr[:, np.newaxis]
-        labels_tst = labels_tst[:, np.newaxis]        
+        labels_tst = labels_tst[:, np.newaxis]
         y_pred = y_pred[:, np.newaxis]
 
     for task in range(t):
@@ -161,6 +162,16 @@ if plot_data:
             aux_y = np.dot(aux_X, est_weights[task, :, k])
             plt.scatter(X_tr[idx, :], y_tr[idx, task])
             plt.plot(aux_X[:, 1], aux_y, 'k--')
+        plt.title('Fitted model for task %d'%task)
+        plt.show()
+        
+    for task in range(t):
+        for k in range(K):
+            idx = labels_tr[:, task] == k
+            idx = idx.squeeze()
+            aux_y = np.dot(X_tr_ext[idx, :], est_weights[task, :, k])
+            plt.scatter(X_tr[idx, :], y_tr[idx, task])
+            plt.plot(np.sort(X_tr[idx, :]), aux_y, c='r')
         plt.title('Fitted model for task %d'%task)
         plt.show()
         

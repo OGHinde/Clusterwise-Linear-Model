@@ -6,8 +6,8 @@
 
 from time import time
 import numpy as np
-#from sklearn.linear_model import Ridge
 import matplotlib.pyplot as plt
+import os
 
 # Add our module to PATH
 from pathlib import Path
@@ -37,7 +37,6 @@ def compute_targets(X, coefs, intercepts, RandomState, noise_var=0.5):
     return intercepts + dot_product + noise
 
 print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
-
 n_tr = 500      # number of training samples
 n_tst = 100     # number of testsamples
 d = 1           # number of input dimensions
@@ -45,12 +44,15 @@ t = 2           # number of tasks
 K = 3           # number of clusters
 seed = None
 plot_data = True
+load_data = True
 save_data = True
+
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
 #model = 'CWLM'
 model = 'MT_CWLM'
 plot_bounds = False
+
 
 if d > 1 & plot_data == True:
     print('''\nWarning: Too many dimensions to plot. 
@@ -58,12 +60,12 @@ if d > 1 & plot_data == True:
     plot_data = False
 
 print('Test parameters:')
-print('\t- Training samples = ', n_tr)
-print('\t- Test samples = ', n_tst)
-print('\t- Input dimensions =', d)
-print('\t- Regression tasks =', t)
-print('\t- Clusters =', K)
-print('\t- Selected model:', model)
+print('\t- Training samples = {}'.format(n_tr))
+print('\t- Test samples = '.format(n_tst))
+print('\t- Input dimensions ='.format(d))
+print('\t- Regression tasks ='.format(t))
+print('\t- Clusters ='.format(K))
+print('\t- Selected model:'.format(model))
 
 if model == 'KMeansRegressor':
     model = KMeansRegressor(n_components=K)
@@ -91,40 +93,60 @@ else:
 RandomState = (np.random.RandomState(seed) if seed != None 
                else np.random.RandomState())
 
-# DATA GENERATION
-print('\nGenerating data...')
-labels_tr = RandomState.randint(0, K, (n_tr, ))
-labels_tst = RandomState.randint(0, K, (n_tst, ))
-
-X_tr = np.empty((n_tr, d))
-X_tst = np.empty((n_tst, d))
-y_tr = np.empty((n_tr, t))
-y_tst = np.empty((n_tst, t))
-
-displace = RandomState.randint(-25, 25, size=(K, d))
-for k in range(K):
-    idx_tr = labels_tr == k
-    idx_tst = labels_tst == k
-    X_tr[idx_tr, :] = 2*RandomState.randn(sum(idx_tr), d) + displace[k, :]
-    X_tst[idx_tst, :] = 2*RandomState.randn(sum(idx_tst), d) + displace[k, :]
-
-intercepts = np.empty((t, K))
-coefs = np.empty((t, d, K))
-
-intercepts = RandomState.randint(-2, 2, size=(t, K))
-coefs = RandomState.randint(-4, 4, size=(t, d, K))
-
-for k in range(K):
-    idx_tr = (labels_tr == k)
-    idx_tst = (labels_tst == k)
-    y_tr[idx_tr, :] = compute_targets(X=X_tr[idx_tr, :], 
-        coefs=coefs[:, :, k], 
-        intercepts=intercepts[:, k], 
-        RandomState=RandomState)
-    y_tst[idx_tst, :] = compute_targets(X_tst[idx_tst, :], 
-        coefs[:, :, k], 
-        intercepts[:, k],  
-        RandomState=RandomState)
+if load_data:
+    while True:
+        filename = input('Specify file name: ')
+        file_path = home + '/Git/Clusterwise_Linear_Model/cwlm/tests/example_datasets/' + filename + '.pickle'
+        print('Attempting to load ' + file_path)
+        if not os.path.isfile(file_path):
+            print('\nFile does not exist.')
+            sys.exit()
+        else:
+            print('\nLoading dataset...')
+            with open(file_path, 'rb') as f:
+                data = pickle.load(f)
+            X_tr = data['X_tr']
+            X_tst = data['X_tst']
+            y_tr = data['y_tr']
+            y_tst = data['y_tst']
+            preloaded_model = data['Trained model']
+            print('Done')
+            break
+else:
+    # Generate new dataset
+    print('\nGenerating data...')
+    labels_tr = RandomState.randint(0, K, (n_tr, ))
+    labels_tst = RandomState.randint(0, K, (n_tst, ))
+    
+    X_tr = np.empty((n_tr, d))
+    X_tst = np.empty((n_tst, d))
+    y_tr = np.empty((n_tr, t))
+    y_tst = np.empty((n_tst, t))
+    
+    displace = RandomState.randint(-25, 25, size=(K, d))
+    for k in range(K):
+        idx_tr = labels_tr == k
+        idx_tst = labels_tst == k
+        X_tr[idx_tr, :] = 2*RandomState.randn(sum(idx_tr), d) + displace[k, :]
+        X_tst[idx_tst, :] = 2*RandomState.randn(sum(idx_tst), d) + displace[k, :]
+    
+    intercepts = np.empty((t, K))
+    coefs = np.empty((t, d, K))
+    
+    intercepts = RandomState.randint(-2, 2, size=(t, K))
+    coefs = RandomState.randint(-4, 4, size=(t, d, K))
+    
+    for k in range(K):
+        idx_tr = (labels_tr == k)
+        idx_tst = (labels_tst == k)
+        y_tr[idx_tr, :] = compute_targets(X=X_tr[idx_tr, :], 
+            coefs=coefs[:, :, k], 
+            intercepts=intercepts[:, k], 
+            RandomState=RandomState)
+        y_tst[idx_tst, :] = compute_targets(X_tst[idx_tst, :], 
+            coefs[:, :, k], 
+            intercepts[:, k],  
+            RandomState=RandomState)
 
 # MODEL EVALUATION
 start = time()
@@ -148,6 +170,7 @@ if plot_data:
     aux_X = np.concatenate((np.ones((2, 1)), 
                             np.array([[np.min(X_tr)-1], [np.max(X_tr)+1]])), 
                             axis=1)
+        
     if est_weights.ndim == 2:
         # Make sure we can iterate even if there's only one task.
         est_weights = est_weights[np.newaxis, :, :]
@@ -183,7 +206,7 @@ if plot_data:
             plt.scatter(X_tst[idx, :], y_pred[idx, task], c='r', marker='.')
         plt.title('Model predictions for task %d'%task)
         plt.show()
-
+        
 if save_data:
     data = {'X_tr': X_tr,
             'y_tr': y_tr,
@@ -203,6 +226,4 @@ if save_data:
             print('Dataset discarded.')
             break
         else:
-            print("Wrong input. Please type 'y' or 'n'.")
-            
-            
+            print("Wrong input. Please type 'y' or 'n'.")            

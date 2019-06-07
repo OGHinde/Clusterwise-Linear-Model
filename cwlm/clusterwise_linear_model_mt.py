@@ -603,7 +603,7 @@ class ClusterwiseLinModel():
         # fit_pred(X, y) are always consistent with fit(X, y).predict(X)
         # for any value of max_iter and tol (and any random_state).
         _, log_resp, labels_tr, labels_X, labels_y = self._e_step(X, y, labels=True)
-        self._m_step(X, y, np.exp(log_resp))
+        
 
         if not self.converged_:
             warnings.warn('Initialization %d did not converge. '
@@ -621,6 +621,9 @@ class ClusterwiseLinModel():
         self.labels_y_ = labels_y.squeeze()
         self.low_bound_curves_ = best_curves
         self.is_fitted_ = True
+
+        # Last m-step to make sure labels and centroids correspond.
+        self._m_step(X, y, self.resp_tr_)
 
     def _e_step(self, X, y, labels):
         """Expectation step.

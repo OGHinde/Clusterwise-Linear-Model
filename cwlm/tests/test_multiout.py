@@ -45,7 +45,7 @@ K = 3           # number of clusters
 seed = None
 plot_data = True
 load_data = False
-save_data = False
+save_data = True
 plot_bounds = False
 
 #model = 'KMeansRegressor'
@@ -177,25 +177,29 @@ if plot_data:
         y_pred = y_pred[:, np.newaxis]
     
     for task in range(t):
-        figure, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex=False, figsize=(6, 6))
+        figure, (ax1, ax2, ax3) = plt.subplots(nrows=3, ncols=1, sharex=False, figsize=(6, 10))
         for k in range(K):
             idx_tr = (labels_tr[:, task] == k).squeeze()
             idx_tst = (labels_tst == k).squeeze()
             
+            ax1.scatter(X_tr, y_tr[:, task])
+            
             aux_X = np.sort(X_tr[idx_tr, :], axis=0)[[0, -1]]
             aux_X_ext = np.hstack((np.ones((2, 1)), aux_X))
             aux_y = np.dot(aux_X_ext, est_weights[task, :, k])
-            ax1.scatter(X_tr[idx_tr, :], y_tr[idx_tr, task])
-            ax1.plot(aux_X, aux_y, 'k--')
+            ax2.scatter(X_tr[idx_tr, :], y_tr[idx_tr, task])
+            ax2.plot(aux_X, aux_y, 'k--')
             
-            ax2.scatter(X_tst[idx_tst, :], y_tst[idx_tst, task])
-            ax2.scatter(X_tst[idx_tst, :], y_pred[idx_tst, task], c='r', marker='.')
-        ax1.set_title('Fitted model')
-        ax2.set_title('Model predictions')
+            ax3.scatter(X_tst[idx_tst, :], y_tst[idx_tst, task])
+            ax3.scatter(X_tst[idx_tst, :], y_pred[idx_tst, task], c='r', marker='.')
+        ax1.set_title('Dataset (training partition)', loc='left')
+        ax2.set_title('Fitted model (training partition)', loc='left')
+        ax3.set_title('Model predictions (test partition)', loc='left')
         figure.tight_layout()
-        st = figure.suptitle('Results for task {}'.format(task+1), fontsize=12, fontweight='bold')
+        st = figure.suptitle('Results for task {}'.format(task+1), fontsize=15, fontweight='bold')
         st.set_y(0.98)
-        figure.subplots_adjust(top=0.85)
+        figure.subplots_adjust(top=0.92)
+        figure.show()
           
 # SAVING MODEL
 if save_data:

@@ -598,13 +598,6 @@ class ClusterwiseLinModel():
                 best_curves = {'standard': bound_curve,
                                'smooth': smooth_bound_curve}
 
-
-        # Always do a final e-step to guarantee that the labels returned by
-        # fit_pred(X, y) are always consistent with fit(X, y).predict(X)
-        # for any value of max_iter and tol (and any random_state).
-        _, log_resp, labels_tr, labels_X, labels_y = self._e_step(X, y, labels=True)
-        
-
         if not self.converged_:
             warnings.warn('Initialization %d did not converge. '
                           'Try different init parameters, '
@@ -612,6 +605,11 @@ class ClusterwiseLinModel():
                           'or check for degenerate data.'
                           % (init + 1), ConvergenceWarning)        
 
+        # Always do a final e-step to guarantee that the labels returned by
+        # fit_pred(X, y) are always consistent with fit(X, y).predict(X)
+        # for any value of max_iter and tol (and any random_state).
+        _, log_resp, labels_tr, labels_X, labels_y = self._e_step(X, y, labels=True)
+        
         self._set_parameters(best_params)
         self.n_iter_ = best_n_iter
         self.lower_bound_ = max_lower_bound
@@ -622,6 +620,7 @@ class ClusterwiseLinModel():
         self.low_bound_curves_ = best_curves
         self.is_fitted_ = True
 
+        # THIS IS HACKY AF AND MUST BE REVISED:
         # Last m-step to make sure labels and centroids correspond.
         self._m_step(X, y, self.resp_tr_)
 

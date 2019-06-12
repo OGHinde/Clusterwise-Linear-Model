@@ -14,10 +14,10 @@ class KMeansRegressor(object):
         self.n_components_ = n_components
         self.alpha_ = alpha
         self.n_init = n_init
-        self.random_state = random_state
         self.kmeans_ = KMeans(n_clusters=self.n_components_, n_init=n_init, random_state=random_state)
         self.verbose = verbose
         self.regs_ = []
+        self.random_state = random_state
         for k in range(self.n_components_):
             self.regs_.append(Ridge(alpha=self.alpha_))
     

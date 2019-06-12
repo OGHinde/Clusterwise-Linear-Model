@@ -183,6 +183,8 @@ if plot_data:
             idx_tst = (labels_tst == k).squeeze()
             
             ax1.scatter(X_tr, y_tr[:, task])
+            ax1.set_xlabel('X')
+            ax1.set_ylabel('y')
             
             aux_X = np.sort(X_tr[idx_tr, :], axis=0)[[0, -1]]
             aux_X_ext = np.hstack((np.ones((2, 1)), aux_X))
@@ -193,8 +195,14 @@ if plot_data:
             ax3.scatter(X_tst[idx_tst, :], y_tst[idx_tst, task])
             ax3.scatter(X_tst[idx_tst, :], y_pred[idx_tst, task], c='r', marker='.')
         ax1.set_title('Dataset (training partition)', loc='left')
+        ax1.set_xlabel('X')
+        ax1.set_ylabel('y')
         ax2.set_title('Fitted model (training partition)', loc='left')
+        ax2.set_xlabel('X')
+        ax2.set_ylabel('y')
         ax3.set_title('Model predictions (test partition)', loc='left')
+        ax3.set_xlabel('X')
+        ax3.set_ylabel('y')
         figure.tight_layout()
         st = figure.suptitle('Results for task {}'.format(task+1), fontsize=15, fontweight='bold')
         st.set_y(0.98)

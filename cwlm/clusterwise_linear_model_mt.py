@@ -234,13 +234,13 @@ def _compute_precision_cholesky(covariances):
             cov_chol = linalg.cholesky(covariance, lower=True)
         except linalg.LinAlgError:
             raise ValueError(estimate_precision_error_message)
-        precisions_chol[k] = linalg.solve_triangular(cov_chol, 
-                                                     np.eye(n_features), 
+        precisions_chol[k] = linalg.solve_triangular(cov_chol,
+                                                     np.eye(n_features),
                                                      lower=True).T
     
     return precisions_chol
 
-def _estimate_regression_params_k(X, y, resp_k, reg_term_k, weight_k):
+def _estimate_regression_params_k(X, y, resp_k, reg_term_k, weight_k, quick=False):
     """Estimate the regression parameters for the output space for component k.
 
     Parameters
@@ -268,11 +268,19 @@ def _estimate_regression_params_k(X, y, resp_k, reg_term_k, weight_k):
     # Compute the output space regression weights using Ridge
     # We'll iterate over all targets for now. Not sure if this can be
     # done without the loop if n_targets > 1.
-    for t in range(n_targets):
-        solver = Ridge(alpha=reg_term_k[t])
-        solver.fit(X, y[:, t], sample_weight=resp_k[:, t] + eps)
-        reg_weights_k[t, 0] = solver.intercept_
-        reg_weights_k[t, 1:] = solver.coef_
+    if quick:
+        avg_alpha = np.mean(reg_term_k)
+        avg_resp = np.mean(resp_k, axis=1) + eps
+        solver = Ridge(alpha=avg_alpha)
+        solver.fit(X, y, sample_weight= avg_resp)
+        reg_weights_k[:, 0] = solver.intercept_
+        reg_weights_k[:, 1:] = solver.coef_
+    else:
+        for t in range(n_targets):
+            solver = Ridge(alpha=reg_term_k[t])
+            solver.fit(X, y[:, t], sample_weight=resp_k[:, t] + eps)
+            reg_weights_k[t, 0] = solver.intercept_
+            reg_weights_k[t, 1:] = solver.coef_
 
     # Compute the output space precision terms
     means = np.dot(X_ext, reg_weights_k.T)
@@ -386,7 +394,8 @@ class ClusterwiseLinModel():
                  max_iter=200, n_init=10, init_params='gmm', smoothing=False, 
                  smooth_window=20, weights_init=None, means_init=None, 
                  covariances_init=None, reg_weights_init=None, 
-                 reg_precisions_init=None, random_seed=None, plot=False):
+                 reg_precisions_init=None, random_seed=None, plot=False, 
+                 quick=False):
         self.weights_init = weights_init                # Pi_k in the notes
         self.means_init = means_init                    # mu_k in the notes
         self.covariances_init = covariances_init        # Sigma_k in the notes              
@@ -403,6 +412,7 @@ class ClusterwiseLinModel():
         self.smooth_window = smooth_window
         self.random_seed = random_seed
         self.plot = plot
+        self.quick = quick
 
     def _check_data(self, X, y):
         """Check that the input data is correctly formatted.
@@ -725,7 +735,8 @@ class ClusterwiseLinModel():
              reg_precisions[:, k]) = _estimate_regression_params_k(X, y,
                                                                    resp[:, :, k],
                                                                    reg_term[:, k],
-                                                                   weights[k])
+                                                                   weights[k],
+                                                                   quick=self.quick)
         
         # Update all the things
         self.weights_ = weights

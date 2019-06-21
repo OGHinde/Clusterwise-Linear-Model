@@ -47,6 +47,7 @@ plot_data = True
 load_data = False
 save_data = True
 plot_bounds = False
+quick = False
 
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
@@ -85,7 +86,8 @@ elif model == 'MT_CWLM':
                     plot=plot_bounds,
                     smoothing=True,
                     tol=1e-10, 
-                    n_init=10)
+                    n_init=10,
+                    quick=quick)
 else:
     print('\nIncorrect model specified')
     sys.exit(0)

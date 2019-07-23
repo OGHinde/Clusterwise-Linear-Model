@@ -632,7 +632,8 @@ class ClusterwiseLinModel():
 
         # THIS IS HACKY AF AND MUST BE REVISED:
         # Last m-step to make sure labels and centroids correspond.
-        self._m_step(X, y, self.resp_tr_)
+        self._m_step(X, y, np.exp(log_resp))
+
 
     def _e_step(self, X, y, labels):
         """Expectation step.

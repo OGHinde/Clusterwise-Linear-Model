@@ -40,14 +40,14 @@ print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
 n_tr = 500      # number of training samples
 n_tst = 100     # number of testsamples
 d = 1           # number of input dimensions
-t = 2           # number of tasks
+t = 1           # number of tasks
 K = 3           # number of clusters
 seed = None
 plot_data = True
 load_data = False
 save_data = True
 plot_bounds = False
-quick = False
+quick = True
 
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'

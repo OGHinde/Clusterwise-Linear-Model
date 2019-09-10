@@ -44,7 +44,7 @@ t = 1           # number of tasks
 K = 3           # number of clusters
 seed = None
 plot_data = True
-load_data = False
+load_data = True
 save_data = True
 plot_bounds = False
 quick = True
@@ -126,7 +126,7 @@ else:
     y_tr = np.empty((n_tr, t))
     y_tst = np.empty((n_tst, t))
     
-    displace = RandomState.randint(-25, 25, size=(K, d))
+    displace = RandomState.randint(-10, 10, size=(K, d))
     for k in range(K):
         idx_tr = labels_tr == k
         idx_tst = labels_tst == k
@@ -195,19 +195,19 @@ if plot_data:
             ax2.plot(aux_X, aux_y, 'k--')
             
             ax3.scatter(X_tst[idx_tst, :], y_tst[idx_tst, task])
-            ax3.scatter(X_tst[idx_tst, :], y_pred[idx_tst, task], c='r', marker='.')
-        ax1.set_title('Dataset (training partition)', loc='left')
+            ax3.scatter(X_tst[idx_tst, :], y_pred[idx_tst, task], c='r', marker='.', label='Preditions')
+        ax1.set_title('Training set', loc='left', fontweight='bold')
         ax1.set_xlabel('X')
         ax1.set_ylabel('y')
-        ax2.set_title('Fitted model (training partition)', loc='left')
+        ax2.set_title('Fitted model on the training set', loc='left', fontweight='bold')
         ax2.set_xlabel('X')
         ax2.set_ylabel('y')
-        ax3.set_title('Model predictions (test partition)', loc='left')
+        ax3.set_title('Model predictions for the test set', loc='left', fontweight='bold')
         ax3.set_xlabel('X')
         ax3.set_ylabel('y')
         figure.tight_layout()
-        st = figure.suptitle('Results for task {}'.format(task+1), fontsize=15, fontweight='bold')
-        st.set_y(0.98)
+        #st = figure.suptitle('Example Dataset'.format(task+1), fontsize=15, fontweight='bold')
+        #st.set_y(0.98)
         figure.subplots_adjust(top=0.92)
         figure.show()
           
@@ -223,6 +223,10 @@ if save_data:
         if challenge == 'y':    
             name = input('Specify file name: ')    
             print('Saving dataset as', name + '.pickle')
+            plt.savefig('example_datasets/' + name + '.png', 
+                        format='png', 
+                        dpi=500, 
+                        bbox_inches='tight')
             with open('example_datasets/' + name + '.pickle', 'wb') as f:
                 pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
             print('Done!')

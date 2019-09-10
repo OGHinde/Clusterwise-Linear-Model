@@ -3,19 +3,12 @@
     Author: Óscar García Hinde <oghinde@tsc.uc3m.es>
     Python Version: 3.6
 
-TODO:
-    - Implement parallelization with MPI.
-    - Implement other input covariances.
-    - Revisit RandomState.
-    - Update docstring.
+This version admits divverent views of the input data for the Gaussian mixture
+model part and the linear regression mixture model, provided there is 1 to 1
+correspondence.
 
-ISSUES:
-    - Weirdness in the lower bound results indicates that something's not
-      quite right.
-    - Turns out this version is a little faster?? LOL Wut?  
-
-NEXT STEPS:
-    - Pruning of weak clusters.
+The GMM view of the input data will be called X_gmm and the regression view
+will be called X_reg.
 """
 
 import sys
@@ -27,8 +20,8 @@ from scipy.misc import logsumexp
 from sklearn.utils import check_array
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.linear_model import Ridge
-from cwlm.kmeans_regressor import KMeansRegressor
-from cwlm.gmm_regressor import GMMRegressor
+from cwlm.kmeans_regressor_mixed import KMeansRegressor
+from cwlm.gmm_regressor_mixed import GMMRegressor
 
 import warnings
 from sklearn.exceptions import ConvergenceWarning
@@ -414,56 +407,66 @@ class ClusterwiseLinModel():
         self.plot = plot
         self.quick = quick
 
-    def _check_data(self, X, y):
+    def _check_data(self, X_gmm, X_reg, y):
         """Check that the input data is correctly formatted.
 
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features)
+        X_gmm : array-like, shape (n_samples, n_gmm_features)
+        X_reg : array-like, shape (n_samples, n_reg_features)
         y : array, shape (n_samples, n_targets)
 
         Returns
         -------
-        t : int, the total number of targets.
-        n : int, the total number of samples.
-        d : int, the total number of features (dimensions)
-
+        t : int, the total number of targets
+        n : int, the total number of samples
+        d_gmm : int, the total number of GMM features
+        d_reg : int, the total number of regression features
         """
 
         if y.ndim == 1:
             y = y[:, np.newaxis]
 
-        n_x, d = X.shape
+        n_x_gmm, d_gmm = X_gmm.shape
+        n_x_reg, d_reg = X_reg.shape
         n_y, t = y.shape
+
+        if n_x_gmm == n_x_gmm:
+            n_x = n_x_gmm
+        else:
+            error_report = 'Both views of the input data must have 1 to 1 sample correspondence.'
+            error_details = '\nX_gmm has {} samples while X_reg has {} samples.'.format(n_x_gmm, n_x_reg) 
+            raise ValueError(error_report, error_details)
 
         if n_x == n_y:
             n = n_x
         else:
-            print('Data size error. Number of samples in X and y must match:')
-            print('X n_samples = {}, y n_samples = {}'.format(n_x, n_y))
-            print('Exiting.')
-            sys.exit()
+            error_report = 'Data size error. Number of samples in X and y must match:'
+            error_details = 'X n_samples = {}, y n_samples = {}'.format(n_x, n_y)
+            raise ValueError(error_report, error_details)
 
-        return t, n, d, X, y
+        return t, n, d_gmm, d_reg, X_gmm, X_reg, y
 
-    def _initialise(self, X, y, random_state):
+    def _initialise(self, X_gmm, X_reg, y, random_state):
         """Initialization of the Clusterwise Linear Model parameters.    
 
         Parameters
         ----------
-        X : array, shape (n_samples, n_features)
+        X_gmm : array-like, shape (n_samples, n_gmm_features)
+        X_reg : array-like, shape (n_samples, n_reg_features)
         y : array, shape (n_samples, n_targets)
 
         resp : array-like, shape (n_samples, n_components)
         """
         
-        n, d = X.shape
+        n, d_gmm = X_gmm.shape
+        _, d_reg = X_reg.shape
 
         if self.init_params == 'kmeans':
             initializer = KMeansRegressor(n_components=self.n_components, 
                                           alpha=self.eta,
                                           random_state=random_state)
-            initializer.fit(X, y)
+            initializer.fit(X_gmm, X_reg, y)
             resp = np.zeros((n, self.n_components))
             resp[np.arange(n), initializer.labels_tr_] = 1
             reg_weights = initializer.reg_weights_
@@ -475,13 +478,13 @@ class ClusterwiseLinModel():
                                        n_init=1, 
                                        covariance_type='full',
                                        random_state=random_state)
-            initializer.fit(X, y)
+            initializer.fit(X_gmm, X_reg, y)
             resp = initializer.resp_tr_
             reg_weights = initializer.reg_weights_
             reg_precisions = initializer.reg_precisions_
         
         elif self.init_params == 'random':
-            # This tends to work like crap.
+            # This tends to work like crap. DON'T USE
             # TODO: adapt it to multitarget.
             resp = RandomState.rand(n, self.n_components)
             resp /= resp.sum(axis=1)[:, np.newaxis]
@@ -516,7 +519,7 @@ class ClusterwiseLinModel():
         else: 
             self.reg_precisions_ = self.reg_precisions_init
 
-    def fit(self, X, y):
+    def fit(self, X_gmm, X_reg, y):
         """Fit the clustered linear regressor model for a training 
         data set using the EM algorithm.
 
@@ -535,7 +538,6 @@ class ClusterwiseLinModel():
         -------
         self
         """
-        n, d = X.shape
         max_lower_bound = -np.infty
         self.converged_ = False
         self.is_fitted_ = False
@@ -543,13 +545,14 @@ class ClusterwiseLinModel():
         # Summon the Random Number Gods
         rng = RandomState(self.random_seed)
         
-        t, n, d, X, y = self._check_data(X, y)
+        t, n, d_gmm, d_reg, X_gmm, X_reg, y = self._check_data(X_gmm, X_reg, y)
         self.n_targets_ = t
-        self.n_input_dims_ = d
+        self.n_gmm_dims_ = d_gmm
+        self.n_reg_dims_ = d_reg
         
         for init in range(self.n_init):            
             lower_bound = -np.infty
-            self._initialise(X, y, rng)
+            self._initialise(X_gmm, X_reg, y, rng)
             bound_curve = []
             smooth_bound_curve = []
 
@@ -564,8 +567,8 @@ class ClusterwiseLinModel():
                     prev_lower_bound = lower_bound
 
                 # E-Step and M-Step
-                log_prob_norm, log_resp = self._e_step(X, y, labels=False)
-                self._m_step(X, y, np.exp(log_resp))
+                log_prob_norm, log_resp = self._e_step(X_gmm, X_reg, y, labels=False)
+                self._m_step(X_gmm, X_reg, y, np.exp(log_resp))
 
                 # Update lower bound
                 lower_bound = self._compute_lower_bound(log_prob_norm)
@@ -618,7 +621,7 @@ class ClusterwiseLinModel():
         # Always do a final e-step to guarantee that the labels returned by
         # fit_pred(X, y) are always consistent with fit(X, y).predict(X)
         # for any value of max_iter and tol (and any random_state).
-        _, log_resp, labels_tr, labels_X, labels_y = self._e_step(X, y, labels=True)
+        _, log_resp, labels_tr, labels_X, labels_y = self._e_step(X_gmm, X_reg, y, labels=True)
         
         self._set_parameters(best_params)
         self.n_iter_ = best_n_iter
@@ -632,10 +635,10 @@ class ClusterwiseLinModel():
 
         # THIS IS HACKY AF AND MUST BE REVISED:
         # Last m-step to make sure labels and centroids correspond.
-        self._m_step(X, y, np.exp(log_resp))
+        self._m_step(X_gmm, X_reg, y, np.exp(log_resp))
 
 
-    def _e_step(self, X, y, labels):
+    def _e_step(self, X_gmm, X_reg, y, labels):
         """Expectation step.
 
         Parameters
@@ -691,7 +694,7 @@ class ClusterwiseLinModel():
         else:
             return log_prob_norm, log_resp
 
-    def _m_step(self, X, y, resp):
+    def _m_step(self, X_gmm, X_reg, y, resp):
         """Maximization step.
 
         Parameters
@@ -747,7 +750,7 @@ class ClusterwiseLinModel():
         self.reg_weights_ = reg_weights.squeeze()
         self.reg_precisions_ = reg_precisions.squeeze()
 
-    def predict(self, X):
+    def predict(self, X_gmm, X_reg):
         """Estimate the values of the outputs for a new set of inputs.
 
         Compute the expected value of y given the trained model and a set
@@ -762,8 +765,7 @@ class ClusterwiseLinModel():
         targets : array, shape (n_samples, 1)
         """
         if not self.is_fitted_: 
-            print("Model isn't fitted.")
-            return
+            raise RuntimeError("Model isn't fitted.")
 
         eps = 10 * np.finfo(self.resp_tr_.dtype).eps
         n, d = X.shape
@@ -803,7 +805,7 @@ class ClusterwiseLinModel():
 
         return targets
 
-    def predict_score(self, X, y, metric='R2'):
+    def predict_score(self, X_gmm, X_reg, y, metric='R2'):
         """Estimate and score the values of the outputs for a new set of inputs
 
         Compute the expected value of y given the trained model and a set X of 
@@ -842,7 +844,7 @@ class ClusterwiseLinModel():
 
         return y_est, score
 
-    def score(self, X, y, metric='R2'):
+    def score(self, X_gmm, X_reg, y, metric='R2'):
         """Score the values of the outputs for a new set of inputs
 
         Parameters

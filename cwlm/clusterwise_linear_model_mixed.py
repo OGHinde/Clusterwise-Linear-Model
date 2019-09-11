@@ -531,7 +531,8 @@ class ClusterwiseLinModel():
 
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features)
+        X_gmm : array-like, shape (n_samples, n_gmm_features)
+        X_reg : array-like, shape (n_samples, n_reg_features)
         y : array, shape (n_samples, n_targets)
 
         Returns
@@ -643,7 +644,8 @@ class ClusterwiseLinModel():
 
         Parameters
         ----------
-        X      : array-like, shape (n_samples, n_features)
+        X_gmm : array-like, shape (n_samples, n_gmm_features)
+        X_reg : array-like, shape (n_samples, n_reg_features)
         y      : array-like, shape (n_samples, n_targets)
         labels : boolean. If True, returns all hard labels.
 
@@ -656,7 +658,7 @@ class ClusterwiseLinModel():
             Logarithm of the posterior probabilities (or responsibilities) of
             the point of each input-output pair in X & y.
         """
-        n, _ = X.shape
+        n, _ = X_gmm.shape
         reg_weights = self.reg_weights_
         reg_precisions = self.reg_precisions_
         if self.n_targets_ == 1:
@@ -665,11 +667,11 @@ class ClusterwiseLinModel():
 
         # Compute all the log-factors for the responsibility expression
         log_weights = np.log(self.weights_)
-        log_prob_X = _estimate_log_prob_X(X, self.means_, self.precisions_cholesky_)
+        log_prob_X = _estimate_log_prob_X(X_gmm, self.means_, self.precisions_cholesky_)
         log_prob_y = np.empty((n, self.n_targets_, self.n_components))
         weighted_log_prob = np.empty_like(log_prob_y)
         for k in range(self.n_components):
-            log_prob_y[:, :, k] = _estimate_log_prob_y_k(X, y, 
+            log_prob_y[:, :, k] = _estimate_log_prob_y_k(X_reg, y, 
                                                          reg_weights[:, :, k], 
                                                          reg_precisions[:, k])
             weighted_log_prob[:, :, k] = (log_weights[k] + 
@@ -699,7 +701,8 @@ class ClusterwiseLinModel():
 
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features)
+        X_gmm : array-like, shape (n_samples, n_gmm_features)
+        X_reg : array-like, shape (n_samples, n_reg_features)
         y : array-like, shape (n_samples, n_targets)
         log_resp : array-like, shape (n_samples, n_targets, n_components)
 
@@ -707,7 +710,8 @@ class ClusterwiseLinModel():
             Logarithm of the posterior probabilities (or responsibilities) of
             the point of each sample in X.
         """
-        n, d = X.shape
+        n, d_gmm = X_gmm.shape
+        _, d_reg = X_reg.shape
         #resp = np.exp(log_resp)
         #resp_task = np.exp(log_resp.mean(axis=1)) # ¿?
         resp_task = resp.mean(axis=1) # ¿?
@@ -726,7 +730,7 @@ class ClusterwiseLinModel():
         # Calculate input space mixture parameters
         (_, 
         means, 
-        covariances) = _estimate_gaussian_parameters(X, resp_task, self.reg_covar)      
+        covariances) = _estimate_gaussian_parameters(X_gmm, resp_task, self.reg_covar)      
         precisions_cholesky = _compute_precision_cholesky(covariances)
 
         # Calculate the output space regression parameters
@@ -736,7 +740,7 @@ class ClusterwiseLinModel():
         reg_precisions = np.zeros((self.n_targets_, self.n_components))
         for k in range(self.n_components):
             (reg_weights[:, :, k], 
-             reg_precisions[:, k]) = _estimate_regression_params_k(X, y,
+             reg_precisions[:, k]) = _estimate_regression_params_k(X_reg, y,
                                                                    resp[:, :, k],
                                                                    reg_term[:, k],
                                                                    weights[k],
@@ -758,7 +762,8 @@ class ClusterwiseLinModel():
 
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features)
+        X_gmm : array-like, shape (n_samples, n_gmm_features)
+        X_reg : array-like, shape (n_samples, n_reg_features)
 
         Returns
         -------
@@ -768,10 +773,12 @@ class ClusterwiseLinModel():
             raise RuntimeError("Model isn't fitted.")
 
         eps = 10 * np.finfo(self.resp_tr_.dtype).eps
-        n, d = X.shape
-        if d != self.n_input_dims_:
-            print('Incorrect dimensions for input data.')
-            sys.exit(0)
+        n, d_gmm = X_gmm.shape
+        _, d_reg = X_reg.shape
+        if d_gmm != self.n_gmm_dims_:
+            raise ValueError('Incorrect dimensions for the GMM input data.')
+        if d_reg != self.n_reg_dims_:
+            raise ValueError('Incorrect dimensions for the regression input data.')
         
         reg_weights = self.reg_weights_
         reg_precisions = self.reg_precisions_
@@ -779,12 +786,12 @@ class ClusterwiseLinModel():
             reg_weights = reg_weights[np.newaxis, :, :]
             reg_precisions = reg_precisions[np.newaxis, :]
 
-        X_ext = np.concatenate((np.ones((n, 1)), X), axis=1)
+        X_ext = np.concatenate((np.ones((n, 1)), X_reg), axis=1)
         targets = np.zeros((n, self.n_targets_))
 
         # Compute all the log-factors for the responsibility expression
         log_weights = np.log(self.weights_)
-        log_prob_X = _estimate_log_prob_X(X, self.means_, self.precisions_cholesky_)
+        log_prob_X = _estimate_log_prob_X(X_gmm, self.means_, self.precisions_cholesky_)
         
         # Compute log-responsibilities
         weighted_log_prob = log_weights + log_prob_X
@@ -814,7 +821,8 @@ class ClusterwiseLinModel():
 
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features)
+        X_gmm : array-like, shape (n_samples, n_gmm_features)
+        X_reg : array-like, shape (n_samples, n_reg_features)
         y_real : array-like, shape (n_samples, n_targets)
 
         Returns
@@ -822,7 +830,7 @@ class ClusterwiseLinModel():
         y : array, shape (n_samples, n_targets)
         score : int
         """
-        y_est = self.predict(X)
+        y_est = self.predict(X_gmm, X_reg)
         
         if metric == 'MSE':
             score = mean_squared_error(y, y_est)
@@ -849,7 +857,8 @@ class ClusterwiseLinModel():
 
         Parameters
         ----------
-        X : array-like, shape (n_samples, n_features)
+        X_gmm : array-like, shape (n_samples, n_gmm_features)
+        X_reg : array-like, shape (n_samples, n_reg_features)
         y_real : array-like, shape (n_samples, n_targets)
 
 
@@ -857,7 +866,7 @@ class ClusterwiseLinModel():
         -------
         score : int
         """
-        _, score = self.predict_score(X, y, metric)
+        _, score = self.predict_score(X_gmm, X_reg, y, metric)
 
     def _compute_lower_bound(self, log_prob_norm):
         """Compute the model's complete data log likelihood.

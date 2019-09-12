@@ -158,7 +158,7 @@ class GMMRegressor(object):
 
         return t, n, d_gmm, d_reg, X_gmm, X_reg, y
 
-    def fit(self, X_gmm, X_reg y):
+    def fit(self, X_gmm, X_reg, y):
         self.is_fitted_ = False
         t, n, d_gmm, d_reg, X_gmm, X_reg, y = self._check_data(X, y)
         eps = 10 * np.finfo(float).eps

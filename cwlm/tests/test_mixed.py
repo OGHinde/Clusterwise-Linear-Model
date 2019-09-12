@@ -16,10 +16,9 @@ import sys
 sys.path.append(home + '/Git/Clusterwise_Linear_Model/')
 
 import pickle
-from cwlm.clusterwise_linear_model import ClusterwiseLinModel as CWLM
-from cwlm.clusterwise_linear_model_mt import ClusterwiseLinModel as MT_CWLM
-from cwlm.gmm_regressor import GMMRegressor
-from cwlm.kmeans_regressor import KMeansRegressor
+from cwlm.clusterwise_linear_model_mixed import ClusterwiseLinModel as CWLM
+from cwlm.gmm_regressor_mixed import GMMRegressor
+from cwlm.kmeans_regressor_mixed import KMeansRegressor
 
 def time_format(seconds):
     """Display a time given in seconds in a more pleasing manner.
@@ -39,7 +38,8 @@ def compute_targets(X, coefs, intercepts, RandomState, noise_var=0.5):
 print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
 n_tr = 500      # number of training samples
 n_tst = 100     # number of testsamples
-d = 1           # number of input dimensions
+d_gmm = 10       # number of input dimensions for the gmm view input matrix
+d_reg = 5       # number of input dimensions for the reg view input matrix
 t = 1           # number of tasks
 K = 3           # number of clusters
 seed = None
@@ -51,19 +51,13 @@ quick = True
 
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
-#model = 'CWLM'
-model = 'MT_CWLM'
-
-
-if d > 1 & plot_data == True:
-    print('''\nWarning: Too many dimensions to plot. 
-          Plotting defaulted to False.''')
-    plot_data = False
+model = 'CWLM'
 
 print('Test parameters:')
 print('\t- Training samples = {}'.format(n_tr))
 print('\t- Test samples = {}'.format(n_tst))
-print('\t- Input dimensions = {}'.format(d))
+print('\t- Input dimensions for gmm = {}'.format(d_gmm))
+print('\t- Input dimensions for gmm = {}'.format(d_reg))
 print('\t- Regression tasks = {}'.format(t))
 print('\t- Number of clusters = {}'.format(K))
 print('\t- Selected model: {}'.format(model))
@@ -80,14 +74,6 @@ elif model == 'CWLM':
                  tol=1e-10, 
                  n_init=10,
                  random_seed=1)
-elif model == 'MT_CWLM':
-    model = MT_CWLM(n_components=K, 
-                    init_params='gmm', 
-                    plot=plot_bounds,
-                    smoothing=True,
-                    tol=1e-10, 
-                    n_init=10,
-                    quick=quick)
 else:
     print('\nIncorrect model specified')
     sys.exit(0)
@@ -96,75 +82,64 @@ RandomState = (np.random.RandomState(seed) if seed != None
                else np.random.RandomState())
 
 # DATA GENERATION
-if load_data:
-    while True:
-        filename = input('Specify file name: ')
-        file_path = home + '/Git/Clusterwise_Linear_Model/cwlm/tests/example_datasets/' + filename + '.pickle'
-        print('Attempting to load ' + file_path)
-        if not os.path.isfile(file_path):
-            print('\nFile does not exist.')
-            sys.exit()
-        else:
-            print('\nLoading dataset...')
-            with open(file_path, 'rb') as f:
-                data = pickle.load(f)
-            X_tr = data['X_tr']
-            X_tst = data['X_tst']
-            y_tr = data['y_tr']
-            y_tst = data['y_tst']
-            preloaded_model = data['Trained model']
-            print('Done')
-            break
-else:
-    # Generate new dataset
-    print('\nGenerating data...')
-    labels_tr = RandomState.randint(0, K, (n_tr, ))
-    labels_tst = RandomState.randint(0, K, (n_tst, ))
+
+# Generate new dataset
+print('\nGenerating data...')
+labels_tr = RandomState.randint(0, K, (n_tr, ))
+labels_tst = RandomState.randint(0, K, (n_tst, ))
     
-    X_tr = np.empty((n_tr, d))
-    X_tst = np.empty((n_tst, d))
-    y_tr = np.empty((n_tr, t))
-    y_tst = np.empty((n_tst, t))
+X_gmm_tr = np.empty((n_tr, d_gmm))
+X_reg_tr = np.empty((n_tr, d_reg))
+X_gmm_tst = np.empty((n_tst, d_gmm))
+X_reg_tst = np.empty((n_tst, d_reg))
+y_tr = np.empty((n_tr, t))
+y_tst = np.empty((n_tst, t))
     
-    displace = RandomState.randint(-10, 10, size=(K, d))
-    for k in range(K):
-        idx_tr = labels_tr == k
-        idx_tst = labels_tst == k
-        X_tr[idx_tr, :] = 2*RandomState.randn(sum(idx_tr), d) + displace[k, :]
-        X_tst[idx_tst, :] = 2*RandomState.randn(sum(idx_tst), d) + displace[k, :]
+displace_gmm = RandomState.randint(-10, 10, size=(K, d_gmm))
+displace_reg = RandomState.randint(-10, 10, size=(K, d_reg))
+for k in range(K):
+    idx_tr = labels_tr == k
+    idx_tst = labels_tst == k
+    X_gmm_tr[idx_tr, :] = 2*RandomState.randn(sum(idx_tr), d_gmm) + displace_gmm[k, :]
+    X_reg_tr[idx_tr, :] = 2*RandomState.randn(sum(idx_tr), d_reg) + displace_reg[k, :]
+    X_gmm_tst[idx_tst, :] = 2*RandomState.randn(sum(idx_tst), d_gmm) + displace_gmm[k, :]
+    X_reg_tst[idx_tst, :] = 2*RandomState.randn(sum(idx_tst), d_reg) + displace_reg[k, :]
+
+X_reg_tr = np.hstack((X_gmm_tr, X_reg_tr))
+X_reg_tst = np.hstack((X_gmm_tst, X_reg_tst))
+
+intercepts = np.empty((t, K))
+coefs = np.empty((t, d_gmm + d_reg, K))
     
-    intercepts = np.empty((t, K))
-    coefs = np.empty((t, d, K))
+intercepts = RandomState.randint(-2, 2, size=(t, K))
+coefs = RandomState.randint(-4, 4, size=(t, d_gmm + d_reg, K))
     
-    intercepts = RandomState.randint(-2, 2, size=(t, K))
-    coefs = RandomState.randint(-4, 4, size=(t, d, K))
-    
-    for k in range(K):
-        idx_tr = (labels_tr == k)
-        idx_tst = (labels_tst == k)
-        y_tr[idx_tr, :] = compute_targets(X=X_tr[idx_tr, :], 
-            coefs=coefs[:, :, k], 
-            intercepts=intercepts[:, k], 
-            RandomState=RandomState)
-        y_tst[idx_tst, :] = compute_targets(X_tst[idx_tst, :], 
-            coefs[:, :, k], 
-            intercepts[:, k],  
-            RandomState=RandomState)
+for k in range(K):
+    idx_tr = (labels_tr == k)
+    idx_tst = (labels_tst == k)
+    y_tr[idx_tr, :] = compute_targets(X=X_reg_tr[idx_tr, :],
+                                      coefs=coefs[:, :, k],
+                                      intercepts=intercepts[:, k],
+                                      RandomState=RandomState)
+    y_tst[idx_tst, :] = compute_targets(X_reg_tst[idx_tst, :],
+                                        coefs[:, :, k],
+                                        intercepts[:, k],
+                                        RandomState=RandomState)
 
 # MODEL EVALUATION
 start = time()
 print('Fitting model...')
-model.fit(X_tr, y_tr)
+model.fit(X_gmm_tr, X_reg_tr, y_tr)
 stop = time()
 elapsed_time = time_format(stop-start)
 print('Training time =', elapsed_time)
 
-y_pred, scores = model.predict_score(X_tst, y_tst, metric='all')
+y_pred, scores = model.predict_score(X_gmm_tst, X_reg_tst, y_tst, metric='all')
 print('\nTest scores:')
 for key, value in scores.items():
     print('\t- {} = {:.3f}'.format(key, value))
 print('\nDone!')
-
+'''
 # PLOTTING
 if plot_data:    
     est_weights = model.reg_weights_
@@ -236,3 +211,4 @@ if save_data:
             break
         else:
             print("Wrong input. Please type 'y' or 'n'.")            
+'''

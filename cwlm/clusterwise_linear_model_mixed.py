@@ -496,7 +496,7 @@ class ClusterwiseLinModel():
 
         (weights, 
         means, 
-        covariances) = _estimate_gaussian_parameters(X, resp, self.reg_covar)
+        covariances) = _estimate_gaussian_parameters(X_gmm, resp, self.reg_covar)
         weights /= n
 
         self.weights_ = weights if self.weights_init is None else self.weights_init
@@ -735,7 +735,7 @@ class ClusterwiseLinModel():
 
         # Calculate the output space regression parameters
         reg_weights = np.empty((self.n_targets_, 
-                                self.n_input_dims_+1, 
+                                self.n_reg_dims_+1, 
                                 self.n_components))
         reg_precisions = np.zeros((self.n_targets_, self.n_components))
         for k in range(self.n_components):

@@ -68,7 +68,7 @@ elif model == 'GMMRegressor':
     model = GMMRegressor(n_components=K)
 elif model == 'CWLM':
     model = CWLM(n_components=K, 
-                 init_params='kmeans', 
+                 init_params='gmm', 
                  plot=plot_bounds,
                  smoothing=True,
                  tol=1e-10, 

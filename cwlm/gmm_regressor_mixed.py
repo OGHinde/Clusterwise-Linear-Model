@@ -160,7 +160,7 @@ class GMMRegressor(object):
 
     def fit(self, X_gmm, X_reg, y):
         self.is_fitted_ = False
-        t, n, d_gmm, d_reg, X_gmm, X_reg, y = self._check_data(X, y)
+        t, n, d_gmm, d_reg, X_gmm, X_reg, y = self._check_data(X_gmm, X_reg, y)
         eps = 10 * np.finfo(float).eps
         
         # Determine training sample/component posterior probability

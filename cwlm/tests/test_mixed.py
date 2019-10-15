@@ -38,16 +38,17 @@ def compute_targets(X, coefs, intercepts, RandomState, noise_var=0.5):
 print('MULTIOUTPUT CLUSTERED REGRESSION TEST.\n')
 n_tr = 500      # number of training samples
 n_tst = 100     # number of testsamples
-d_gmm = 10       # number of input dimensions for the gmm view input matrix
-d_reg = 5       # number of input dimensions for the reg view input matrix
+d_gmm = 5       # number of input dimensions for the gmm view input matrix
+d_reg = 10       # number of input dimensions for the reg view input matrix
 t = 1           # number of tasks
 K = 3           # number of clusters
 seed = None
 plot_data = True
-load_data = True
-save_data = True
+load_data = False
+save_data = False
 plot_bounds = False
 quick = True
+mode='soft'
 
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
@@ -57,7 +58,7 @@ print('Test parameters:')
 print('\t- Training samples = {}'.format(n_tr))
 print('\t- Test samples = {}'.format(n_tst))
 print('\t- Input dimensions for gmm = {}'.format(d_gmm))
-print('\t- Input dimensions for gmm = {}'.format(d_reg))
+print('\t- Input dimensions for reg = {}'.format(d_reg))
 print('\t- Regression tasks = {}'.format(t))
 print('\t- Number of clusters = {}'.format(K))
 print('\t- Selected model: {}'.format(model))

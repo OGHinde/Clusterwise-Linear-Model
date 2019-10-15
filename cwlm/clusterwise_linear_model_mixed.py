@@ -754,7 +754,7 @@ class ClusterwiseLinModel():
         self.reg_weights_ = reg_weights.squeeze()
         self.reg_precisions_ = reg_precisions.squeeze()
 
-    def predict(self, X_gmm, X_reg):
+    def predict(self, X_gmm, X_reg, mode='soft'):
         """Estimate the values of the outputs for a new set of inputs.
 
         Compute the expected value of y given the trained model and a set
@@ -764,6 +764,7 @@ class ClusterwiseLinModel():
         ----------
         X_gmm : array-like, shape (n_samples, n_gmm_features)
         X_reg : array-like, shape (n_samples, n_reg_features)
+        mode : string, whether to make a soft or hard prediction.
 
         Returns
         -------
@@ -775,10 +776,13 @@ class ClusterwiseLinModel():
         eps = 10 * np.finfo(self.resp_tr_.dtype).eps
         n, d_gmm = X_gmm.shape
         _, d_reg = X_reg.shape
+        
         if d_gmm != self.n_gmm_dims_:
-            raise ValueError('Incorrect dimensions for the GMM input data.')
+            raise ValueError("Incorrect dimensions for the GMM input data.")
         if d_reg != self.n_reg_dims_:
-            raise ValueError('Incorrect dimensions for the regression input data.')
+            raise ValueError("Incorrect dimensions for the regression input data.")
+        if mode not in ['soft', 'hard']:
+            raise ValueError("Prediction mode has to be either 'hard. or 'soft'.")
         
         reg_weights = self.reg_weights_
         reg_precisions = self.reg_precisions_
@@ -800,19 +804,24 @@ class ClusterwiseLinModel():
             # ignore underflow
             log_resp = weighted_log_prob - log_prob_norm[:, np.newaxis]
         resp_tst = np.exp(log_resp)
+        coefs = np.copy(resp_tst)
         labels_tst = log_resp.argmax(axis=1)
+
+        if mode == 'hard':
+            # Force max responsibilities to 1, rest to 0.
+            coefs = (resp_tst == resp_tst.max(axis=1)[:, None]).astype(int)
     
         # Compute the expected value of the predictive posterior.
         for k in range(self.n_components):
             dot_prod = np.dot(X_ext, reg_weights[:, :, k].T)            
-            targets += np.multiply((resp_tst[:, k] + eps)[:, np.newaxis], dot_prod)
+            targets += np.multiply((coefs[:, k] + eps)[:, np.newaxis], dot_prod)
 
         self.resp_tst_ = resp_tst
         self.labels_tst_ = labels_tst
 
         return targets
 
-    def predict_score(self, X_gmm, X_reg, y, metric='R2'):
+    def predict_score(self, X_gmm, X_reg, y, mode='soft', metric='R2'):
         """Estimate and score the values of the outputs for a new set of inputs
 
         Compute the expected value of y given the trained model and a set X of 
@@ -824,13 +833,14 @@ class ClusterwiseLinModel():
         X_gmm : array-like, shape (n_samples, n_gmm_features)
         X_reg : array-like, shape (n_samples, n_reg_features)
         y_real : array-like, shape (n_samples, n_targets)
+        mode : string, whether to make a soft or hard prediction.
 
         Returns
         -------
         y : array, shape (n_samples, n_targets)
         score : int
         """
-        y_est = self.predict(X_gmm, X_reg)
+        y_est = self.predict(X_gmm, X_reg, mode)
         
         if metric == 'MSE':
             score = mean_squared_error(y, y_est)
@@ -852,7 +862,7 @@ class ClusterwiseLinModel():
 
         return y_est, score
 
-    def score(self, X_gmm, X_reg, y, metric='R2'):
+    def score(self, X_gmm, X_reg, y, mode='soft', metric='R2'):
         """Score the values of the outputs for a new set of inputs
 
         Parameters
@@ -866,7 +876,7 @@ class ClusterwiseLinModel():
         -------
         score : int
         """
-        _, score = self.predict_score(X_gmm, X_reg, y, metric)
+        _, score = self.predict_score(X_gmm, X_reg, y, mode, metric)
 
     def _compute_lower_bound(self, log_prob_norm):
         """Compute the model's complete data log likelihood.

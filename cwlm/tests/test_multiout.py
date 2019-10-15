@@ -44,10 +44,11 @@ t = 1           # number of tasks
 K = 3           # number of clusters
 seed = None
 plot_data = True
-load_data = True
-save_data = True
+load_data = False
+save_data = False
 plot_bounds = False
 quick = True
+mode = 'soft'
 
 #model = 'KMeansRegressor'
 #model = 'GMMRegressor'
@@ -159,7 +160,7 @@ stop = time()
 elapsed_time = time_format(stop-start)
 print('Training time =', elapsed_time)
 
-y_pred, scores = model.predict_score(X_tst, y_tst, metric='all')
+y_pred, scores = model.predict_score(X_tst, y_tst, mode=mode, metric='all')
 print('\nTest scores:')
 for key, value in scores.items():
     print('\t- {} = {:.3f}'.format(key, value))
